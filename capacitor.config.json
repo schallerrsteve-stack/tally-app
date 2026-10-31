@@ -1,0 +1,7 @@
+{
+  "appId": "ca.tallyfit.app",
+  "appName": "Tally",
+  "webDir": "dist",
+  "android": { "allowMixedContent": false },
+  "plugins": {}
+}
