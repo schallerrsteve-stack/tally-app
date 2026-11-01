@@ -1197,7 +1197,16 @@ function start(user){
   STORE=createStore({uid:user.id,onChange:(what)=>{S.docs=STORE.docs;syncNote();if(what==='docs'){afterChange();render()}}});
   S.docs=STORE.docs;socialRealtime();route();loadSocial();
 }
+function webInstall(){
+  if(isNative)return;
+  if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent),standalone=window.navigator.standalone||matchMedia('(display-mode: standalone)').matches;
+  let dismissed=false;try{dismissed=localStorage.getItem('tally.installhint')==='1'}catch(e){}
+  if(ios&&!standalone&&!dismissed){const b=document.createElement('div');b.className='installhint';b.innerHTML='<span>Install Tally: tap <b>Share</b> <svg width="15" height="18" viewBox="0 0 15 18" aria-hidden="true" style="vertical-align:-3px"><path d="M7.5 1v10M4 4.5 7.5 1 11 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 7.5H2.5a1 1 0 0 0-1 1V16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V8.5a1 1 0 0 0-1-1H10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg> then <b>Add to Home Screen</b>.</span><button class="x" aria-label="Dismiss">×</button>';
+    b.querySelector('button').onclick=()=>{b.remove();try{localStorage.setItem('tally.installhint','1')}catch(e){}};document.body.appendChild(b)}
+}
 async function boot(){
+  webInstall();
   window.addEventListener('hashchange',()=>{if(S.view!=='social')SOC.thread=null});
   const u=await currentUser();
   if(u)start(u);else render();
