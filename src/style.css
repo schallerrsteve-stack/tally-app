@@ -223,3 +223,6 @@ body{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bot
 .installhint span{flex:1}.installhint .x{color:var(--bg)}
 html{-webkit-text-size-adjust:100%}
 .inp,input,select,textarea{font-size:16px}
+
+.chkrow{display:flex;gap:10px;align-items:flex-start;padding:6px 0;font-size:14px;cursor:pointer}
+.chkrow input{margin-top:3px;flex:none}

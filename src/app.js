@@ -145,7 +145,7 @@ function vDiary(){
   }
   // exercise
   h+=`<section class="card meal"><div class="meal-h"><h3>Exercise</h3><span class="k">${ex?ex.toLocaleString()+' kcal burned':''}</span></div>`;
-  if(d.ex.length){h+=`<div class="entries">`;for(const e of d.ex)h+=`<div class="entry"><div class="main" style="cursor:default"><span class="t"><div class="nm">${esc(e.name)}</div><div class="sub">${e.min?e.min+' min':''}</div></span><span class="kc">${Math.round(e.kcal)}</span></div><button class="x" data-act="delex" data-id="${e.id}" aria-label="Remove ${esc(e.name)}">×</button></div>`;h+=`</div>`}
+  if(d.ex.length){h+=`<div class="entries">`;for(const e of d.ex)h+=`<div class="entry"><div class="main" style="cursor:default"><span class="t"><div class="nm">${esc(e.name)}</div><div class="sub">${e.min?e.min+' min':''}${e.dist?' · '+(Math.round(dOut(e.dist/1000)*10)/10)+' '+distU():''}${e.src==='hc'?' · ⌚ '+esc(e.from||'watch'):''}</div></span><span class="kc">${Math.round(e.kcal)}</span></div><button class="x" data-act="delex" data-id="${e.id}" aria-label="Remove ${esc(e.name)}">×</button></div>`;h+=`</div>`}
   h+=`<div class="addrow row"><button class="btn ghost sm" data-act="addex">+ Add exercise</button><a class="btn ghost sm" href="#workouts">${S.ws?"Resume workout in progress":"Start a workout"}</a></div></section>`;
   if(!d.foods.length&&prev.foods.length)h+=`<div><button class="btn" data-act="copyprev">Copy ${prev.foods.length} food${prev.foods.length>1?'s':''} from ${esc(nice(addDays(S.date,-1),{weekday:'long'}))}</button></div>`;
   h+=`</div><div class="stack">`;
@@ -166,7 +166,7 @@ function vDiary(){
   const wt=weights()[S.date];
   h+=`<section class="card"><div class="spread"><h3 style="font-size:18px">Water</h3><span class="faint">${d.water} / ${p.water} cups</span></div>
     <div class="water" style="margin-top:10px">${Array.from({length:Math.max(p.water,d.water)},(_,i)=>`<button class="${i<d.water?'on':''}" data-act="water" data-n="${i+1}" aria-label="${i+1} cups"></button>`).join('')}</div>
-    <div style="margin-top:18px" class="spread"><h3 style="font-size:18px">Weight</h3>${(()=>{const lw=latestWeight(S.date);return lw&&wt==null?`<span class="faint">Last: ${wOut(lw).toFixed(1)} ${wU()}</span>`:''})()}</div>
+    ${(()=>{const st=((get('hc')||{}).steps||{})[S.date];return st?`<div style="margin-top:18px" class="spread"><h3 style="font-size:18px">Steps</h3><span class="faint">from Health Connect</span></div><div style="font-family:Fraunces,serif;font-size:26px;font-weight:650;margin-top:4px">${st.toLocaleString()}</div>`:''})()}<div style="margin-top:18px" class="spread"><h3 style="font-size:18px">Weight</h3>${(()=>{const lw=latestWeight(S.date);return lw&&wt==null?`<span class="faint">Last: ${wOut(lw).toFixed(1)} ${wU()}</span>`:''})()}</div>
     <div class="row" style="margin-top:8px"><input class="inp" id="wt" type="number" step="0.1" min="0" inputmode="decimal" placeholder="Log today’s weight" value="${wt!=null?wOut(wt).toFixed(1):''}" style="max-width:190px"><span class="muted">${wU()}</span></div>
   </section>`;
   h+=`</div></div>`;
@@ -203,8 +203,8 @@ function vTrends(){
   <h3 style="font-size:16px;margin-top:16px">Average nutrients</h3>
   <div class="ptable">${KEYS.slice(4).map(k=>`<div><span>${META[k][0]}</span><span>${L.length?fmt(avg(k),k)+' '+META[k][1]:'–'}</span></div>`).join('')}</div>
   </section></div>
-  <section class="card" style="margin-top:18px"><details><summary>Show daily table</summary><div style="overflow:auto;margin-top:10px"><table class="data"><thead><tr><th>Date</th><th>kcal</th><th>Goal</th><th>Protein g</th><th>Carbs g</th><th>Fat g</th><th>Exercise</th><th>Weight</th></tr></thead><tbody>
-  ${days.slice().reverse().map(x=>`<tr><td>${esc(nice(x.ds,{weekday:'short',month:'short',day:'numeric'}))}</td><td>${x.logged?Math.round(x.tot.kcal):'–'}</td><td>${x.t}</td><td>${x.logged?Math.round(x.tot.p):'–'}</td><td>${x.logged?Math.round(x.tot.c):'–'}</td><td>${x.logged?Math.round(x.tot.f):'–'}</td><td>${x.ex?Math.round(x.ex):'–'}</td><td>${x.w!=null?wOut(x.w).toFixed(1):'–'}</td></tr>`).join('')}
+  <section class="card" style="margin-top:18px"><details><summary>Show daily table</summary><div style="overflow:auto;margin-top:10px"><table class="data"><thead><tr><th>Date</th><th>kcal</th><th>Goal</th><th>Protein g</th><th>Carbs g</th><th>Fat g</th><th>Exercise</th><th>Steps</th><th>Weight</th></tr></thead><tbody>
+  ${days.slice().reverse().map(x=>`<tr><td>${esc(nice(x.ds,{weekday:'short',month:'short',day:'numeric'}))}</td><td>${x.logged?Math.round(x.tot.kcal):'–'}</td><td>${x.t}</td><td>${x.logged?Math.round(x.tot.p):'–'}</td><td>${x.logged?Math.round(x.tot.c):'–'}</td><td>${x.logged?Math.round(x.tot.f):'–'}</td><td>${x.ex?Math.round(x.ex):'–'}</td><td>${((get('hc')||{}).steps||{})[x.ds]?((get('hc')||{}).steps[x.ds]).toLocaleString():'–'}</td><td>${x.w!=null?wOut(x.w).toFixed(1):'–'}</td></tr>`).join('')}
   </tbody></table></div></details></section>`;
   return h;
 }
@@ -271,8 +271,8 @@ function vProfile(){
       <label class="field">Units<select id="s-units"><option value="metric" ${!im?'selected':''}>Metric (kg, cm)</option><option value="imperial" ${im?'selected':''}>Imperial (lb, in)</option></select></label>
       <label class="field">Sex (for BMR formula)<select id="s-sex"><option value="female" ${p.sex==='female'?'selected':''}>Female</option><option value="male" ${p.sex==='male'?'selected':''}>Male</option></select></label>
       <label class="field">Age<input id="s-age" type="number" min="13" max="110" value="${p.age}"></label>
-      <label class="field">Height (<span id="u-h">${im?'in':'cm'}</span>)<input id="s-h" type="number" step="0.1" value="${im?(p.height/2.54).toFixed(1):p.height}"></label>
-      <label class="field">Weight (<span id="u-w">${im?'lb':'kg'}</span>)<input id="s-w" type="number" step="0.1" value="${(im?p.weight*2.20462:p.weight).toFixed(1)}"></label>
+      <label class="field"><span>Height (<span id="u-h">${im?'in':'cm'}</span>)</span><input id="s-h" type="number" step="0.1" value="${im?(p.height/2.54).toFixed(1):p.height}"></label>
+      <label class="field"><span>Weight (<span id="u-w">${im?'lb':'kg'}</span>)</span><input id="s-w" type="number" step="0.1" value="${(im?p.weight*2.20462:p.weight).toFixed(1)}"></label>
     </div>
     <label class="field">Activity level<select id="s-act">${opt(ACTIVITY,p.activity)}</select></label>
     <label class="field">Goal<select id="s-goal">${opt(GOALS,p.goal)}</select></label>
@@ -285,7 +285,7 @@ function vProfile(){
       <label class="field">Custom calorie goal (optional)<input id="s-k" type="number" min="0" placeholder="Auto: ${auto}" value="${p.kcalOverride||''}"></label>
       <label class="field">Water goal (cups)<input id="s-water" type="number" min="1" max="20" value="${p.water}"></label>
     </div>
-    <label class="row" style="font-size:14px"><input id="s-addex" type="checkbox" ${p.addEx?'checked':''}> Add exercise calories to my daily budget</label>
+    <label class="chkrow"><input id="s-addex" type="checkbox" ${p.addEx?'checked':''}> Add exercise calories to my daily budget</label>
     <div id="perr" class="notice warn" hidden></div>
     <div><button class="btn primary" data-act="saveprofile">Save profile</button></div>
   </form></section>
@@ -299,7 +299,7 @@ function vProfile(){
     </div>
     <p class="faint" style="margin-top:12px">Nutrient targets (fiber, potassium, calcium, iron, vitamin C) follow the US/Canadian Dietary Reference Intakes for your age and sex; sodium uses the 2,300 mg upper limit. These are general guidelines, not medical advice.</p>
   </section>
-  <section class="card"><h3 style="font-size:18px">Your account</h3><p class="muted" style="font-size:14px">Signed in as <b>${esc(S.email||'')}</b>. Your diary is private to you and syncs across your devices.</p>
+  ${hcCard()}<section class="card"><h3 style="font-size:18px">Your account</h3><p class="muted" style="font-size:14px">Signed in as <b>${esc(S.email||'')}</b>. Your diary is private to you and syncs across your devices.</p>
   <div class="row"><button class="btn sm" data-act="export">Copy all data as JSON</button><button class="btn sm" data-act="importopen">Import from Tally web</button><button class="btn sm ghost" data-act="signout">Sign out</button></div><details style="margin-top:12px"><summary>Delete my account</summary><p class="faint">Permanently deletes your account, diary, workouts, messages and achievements. This can’t be undone.</p><button class="btn sm" data-act="delacct" style="color:var(--warn)">Delete everything</button></details></section></div></div>`;
 }
 function saveProfile(){
@@ -1056,7 +1056,7 @@ function vPeople(){
   const sh=get('sharing')||{};const on=k=>sh[k]!==false&&(k!=='weight'&&k!=='nutrition'||sh[k]===true);
   h+=`</div><div class="stack"><section class="card"><h3 style="font-size:18px">You</h3><div class="row" style="margin-top:10px"><input id="me-emoji" class="inp" value="${esc(me.avatar_emoji)}" maxlength="4" style="width:60px;text-align:center;font-size:20px" aria-label="Emoji"><input id="me-name" class="inp" value="${esc(me.display_name)}" maxlength="40" style="flex:1" aria-label="Display name"><button class="btn" data-act="savename">Save</button></div></section>
   <section class="card"><h3 style="font-size:18px">What friends can see</h3><p class="faint" style="margin:6px 0 10px">Never your food diary. Only what you switch on here.</p>
-  ${[['achievements','Post personal records and streaks to the feed'],['workouts','Workouts this week and weekly streak'],['nutrition','Food logging streak'],['weight','Weight change over 30 days (not your weight)']].map(([k,l])=>`<label class="row" style="padding:6px 0;font-size:14px"><input type="checkbox" class="sharetog" data-k="${k}" ${on(k)?'checked':''}> ${l}</label>`).join('')}</section></div></div>`;
+  ${[['achievements','Post personal records and streaks to the feed'],['workouts','Workouts this week and weekly streak'],['nutrition','Food logging streak'],['weight','Weight change over 30 days (not your weight)']].map(([k,l])=>`<label class="chkrow"><input type="checkbox" class="sharetog" data-k="${k}" ${on(k)?'checked':''}> ${l}</label>`).join('')}</section></div></div>`;
   return h;
 }
 const METRICS={workouts:'Most workouts',workout_days:'Most days with a workout',active_minutes:'Most active minutes',logging_days:'Most days with food logged'};
@@ -1163,6 +1163,98 @@ const SACT={
   chalresp:async el=>{await sb.from('challenge_participants').update({status:el.dataset.s}).eq('challenge_id',el.dataset.id).eq('user_id',S.uid);await loadChallenges();render()},
 };
 
+/* ---------- watch sync: Health Connect (Android) ---------- */
+// Reads steps, workouts and weight that Samsung Health, Fitbit / Google Health, Pixel Watch, Garmin etc. share with Health Connect.
+const APP_ID='ca.tallyfit.app';
+const WNAMES={running:'Run',runningTreadmill:'Treadmill run',walking:'Walk',hiking:'Hike',cycling:'Bike ride',bikingStationary:'Stationary bike',swimming:'Swim',swimmingPool:'Pool swim',swimmingOpenWater:'Open-water swim',rowing:'Rowing',rowingMachine:'Rowing machine',elliptical:'Elliptical',yoga:'Yoga',pilates:'Pilates',strengthTraining:'Strength training',traditionalStrengthTraining:'Strength training',functionalStrengthTraining:'Functional training',weightlifting:'Weightlifting',highIntensityIntervalTraining:'HIIT',stairClimbing:'Stair climbing',stairClimbingMachine:'Stair climber',dance:'Dance',dancing:'Dance',tennis:'Tennis',soccer:'Soccer',basketball:'Basketball',golf:'Golf',skiing:'Skiing',downhillSkiing:'Downhill skiing',crossCountrySkiing:'Cross-country skiing',iceSkating:'Skating',hockey:'Hockey',iceHockey:'Hockey',boxing:'Boxing',martialArts:'Martial arts',calisthenics:'Calisthenics',stretching:'Stretching',other:'Workout'};
+const WMET={running:9.8,runningTreadmill:9.8,walking:3.5,hiking:6,cycling:8,bikingStationary:6.8,swimming:5.8,swimmingPool:5.8,swimmingOpenWater:6,rowing:7,rowingMachine:7,elliptical:5,yoga:2.5,pilates:3,highIntensityIntervalTraining:8,stairClimbing:9,stairClimbingMachine:9,dance:5,dancing:5,tennis:7.3,soccer:7,basketball:6.5};
+const SRC={'com.sec.android.app.shealth':'Samsung Health','com.fitbit.FitbitMobile':'Fitbit','com.google.android.apps.fitness':'Google Fit','com.google.android.apps.healthdata':'Health Connect','com.garmin.android.apps.connectmobile':'Garmin Connect','com.ouraring.oura':'Oura','com.strava':'Strava','com.withings.wiscale2':'Withings','com.google.android.apps.wearables.healthconnect':'Pixel Watch'};
+const wName=t=>WNAMES[t]||String(t||'workout').replace(/([A-Z])/g,' $1').toLowerCase().replace(/^./,c=>c.toUpperCase());
+const srcName=(n,id)=>SRC[id]||SRC[n]||(n&&!/\./.test(n)?n:'your watch');
+let HPL=null;
+const hcNative=()=>isNative||!!window.__tallyHealthMock; // the mock is only used by automated tests
+async function hp(){if(window.__tallyHealthMock)return window.__tallyHealthMock;if(!isNative)return null;if(!HPL)HPL=(await import('@capgo/capacitor-health')).Health;return HPL}
+const hcOn=()=>{try{return localStorage.getItem('tally.hc.on')==='1'}catch(e){return false}};
+function hcPrefs(){let p={};try{p=JSON.parse(localStorage.getItem('tally.hc.prefs')||'{}')||{}}catch(e){}return Object.assign({steps:true,workouts:true,weight:true},p)}
+function setHcPrefs(p){try{localStorage.setItem('tally.hc.prefs',JSON.stringify(p))}catch(e){}}
+async function hcConnect(){
+  const H=await hp();if(!H)return;
+  let a;try{a=await H.isAvailable()}catch(e){a={available:false,reason:String(e.message||e)}}
+  if(!a.available){S.hcMsg='Health Connect isn’t ready on this phone. On Android 13 or older, install “Health Connect” from the Play Store, then try again.';render();return}
+  let st;try{st=await H.requestAuthorization({read:['steps','workouts','calories','weight'],write:[]})}catch(e){S.hcMsg='Couldn’t ask for permission: '+(e.message||e);render();return}
+  if(!st.readAuthorized||!st.readAuthorized.length){S.hcMsg='No permissions were granted. Tap Connect again and allow steps, exercise and weight.';render();return}
+  try{localStorage.setItem('tally.hc.on','1')}catch(e){}
+  S.hcPerm=st.readAuthorized;S.hcMsg='';await hcSync(true);
+}
+function hcDisconnect(){try{localStorage.removeItem('tally.hc.on')}catch(e){}S.hcMsg='Stopped syncing. To remove Tally’s access completely, open Health Connect settings.';render()}
+let hcBusy=false,hcLastRun=0;
+async function hcSync(full,manual){
+  if(hcBusy||!hcOn()||!S.uid)return;
+  if(!full&&!manual&&Date.now()-hcLastRun<10*60000)return;
+  const H=await hp();if(!H)return;
+  hcBusy=true;hcLastRun=Date.now();S.hcSyncing=true;if(S.view==='profile')render();
+  const prefs=hcPrefs();let added=0;const errs=[];
+  try{
+    const doc=Object.assign({steps:{},ignored:[],srcs:{}},get('hc')||{});
+    const firstTime=!doc.last;const days=full||firstTime?30:7;
+    const start=new Date();start.setHours(0,0,0,0);start.setDate(start.getDate()-days+1);const end=new Date();
+    const range={startDate:start.toISOString(),endDate:end.toISOString()};
+    if(prefs.steps){try{const {samples}=await H.queryAggregated(Object.assign({dataType:'steps',bucket:'day',aggregation:'sum'},range));
+      for(const s of samples){const d=iso(new Date(s.startDate));const v=Math.round(s.value||0);if(v>0)doc.steps[d]=v}}catch(e){errs.push('steps')}}
+    if(prefs.workouts){try{
+      let anchor,list=[];do{const r=await H.queryWorkouts(Object.assign({limit:50,anchor},range));list=list.concat(r.workouts||[]);anchor=r.anchor}while(anchor&&list.length<400);
+      const kg=targets(today()).w,byDay={};
+      for(const w of list){if(w.sourceId===APP_ID)continue;const hid='hc-'+String(w.platformId||w.startDate).replace(/[^A-Za-z0-9_.:-]/g,'').slice(0,60);if(doc.ignored.includes(hid))continue;
+        const st=new Date(w.startDate),en=new Date(w.endDate);(byDay[iso(st)]=byDay[iso(st)]||[]).push({w,hid,st:+st,en:+en})}
+      for(const [date,items] of Object.entries(byDay)){
+        const d=day(date);let changed=false;const tally=allWorkouts().filter(x=>x.date===date&&x.start&&x.end);
+        for(const {w,hid,st,en} of items){
+          const min=Math.max(1,Math.round((w.duration||(en-st)/1000)/60));
+          // Skip if this overlaps a workout you logged in Tally (same session recorded twice)
+          if(tally.some(x=>Math.min(x.end,en)-Math.max(x.start,st)>0.5*Math.min(x.end-x.start,en-st)))continue;
+          const kcal=Math.round(w.totalEnergyBurned>0?w.totalEnergyBurned:(WMET[w.workoutType]||5)*kg*min/60);
+          const e={id:hid,name:wName(w.workoutType),min,kcal,src:'hc',from:srcName(w.sourceName,w.sourceId),start:w.startDate};
+          if(w.totalDistance>0)e.dist=Math.round(w.totalDistance);
+          const i=d.ex.findIndex(x=>x.id===hid);
+          if(i<0){d.ex.push(e);changed=true;added++}else if(d.ex[i].kcal!==e.kcal||d.ex[i].min!==e.min){d.ex[i]=Object.assign({},d.ex[i],e);changed=true}
+        }
+        if(changed)put(dk(date),d);
+      }}catch(e){errs.push('workouts')}}
+    if(prefs.weight){try{const {samples}=await H.readSamples(Object.assign({dataType:'weight',limit:500},range));
+      const wd=get('weights')||{e:{}};wd.e=wd.e||{};wd.hc=wd.hc||{};let ch=false;
+      for(const s of samples.sort((a,b)=>a.startDate<b.startDate?-1:1)){if(s.sourceId===APP_ID||!(s.value>0))continue;const dt=iso(new Date(s.startDate));
+        if(wd.e[dt]!=null&&!wd.hc[dt])continue; // a weight you typed in yourself always wins
+        const v=r2(s.value);if(wd.e[dt]!==v){wd.e[dt]=v;wd.hc[dt]=1;ch=true}}
+      if(ch)put('weights',wd)}catch(e){errs.push('weight')}}
+    doc.last=Date.now();put('hc',doc);
+    S.hcMsg=errs.length?`Synced, but couldn’t read ${errs.join(', ')} — check Tally’s permissions in Health Connect.`:(added?`Added ${added} workout${added>1?'s':''} from your watch.`:'');
+    if(added&&S.view!=='profile')toast(`⌚ Added ${added} workout${added>1?'s':''} from your watch`);
+  }catch(e){S.hcMsg='Sync problem: '+(e.message||e)}
+  finally{hcBusy=false;S.hcSyncing=false;render()}
+}
+function hcCard(){
+  if(!hcNative())return `<section class="card"><h3 style="font-size:18px">Watch &amp; fitness apps</h3><p class="muted" style="font-size:14px;margin-bottom:0">Connect a Samsung, Fitbit, Pixel or Garmin watch from the Tally Android app. Steps and workouts it imports show up here too.</p></section>`;
+  const p=hcPrefs(),doc=get('hc')||{},on=hcOn();
+  const last=doc.last?new Date(doc.last).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):null;
+  return `<section class="card"><div class="spread"><h3 style="font-size:18px">Watch &amp; fitness apps</h3>${on?'<span class="tag mine">Connected</span>':''}</div>
+  <p class="muted" style="font-size:14px">Tally reads from <b>Health Connect</b>, where Samsung Health, Fitbit, Pixel Watch, Garmin and others share your activity.${on?'':' First make sure your watch’s app is set to sync with Health Connect.'}</p>
+  ${on?`${[['steps','Daily steps'],['workouts','Workouts (added to your Exercise, so they count toward your calorie budget)'],['weight','Weight from a smart scale (your own entries always win)']].map(([k,l])=>`<label class="chkrow"><input type="checkbox" class="hctog" data-k="${k}" ${p[k]?'checked':''}> ${l}</label>`).join('')}
+  <p class="faint" style="margin:8px 0">${S.hcSyncing?'<span class="spin"></span> Syncing…':last?'Last synced '+esc(last):'Not synced yet'}</p>
+  <div class="row"><button class="btn sm primary" data-act="hcsync" ${S.hcSyncing?'disabled':''}>Sync now</button><button class="btn sm" data-act="hcsettings">Health Connect settings</button><button class="btn sm ghost" data-act="hcoff">Stop syncing</button></div>`
+  :`<button class="btn primary" data-act="hcconnect">Connect watch</button>`}
+  ${S.hcMsg?`<div class="notice ${/problem|couldn|isn|No perm/i.test(S.hcMsg)?'warn':''}" style="margin-top:12px">${esc(S.hcMsg)}</div>`:''}
+  <details style="margin-top:10px"><summary>Watch data not showing up?</summary><ul class="faint" style="padding-left:18px;margin:8px 0 0">
+  <li><b>Samsung:</b> Samsung Health → Settings → Health Connect → allow it to write steps and exercise, and turn on “Sync with Samsung account”.</li>
+  <li><b>Fitbit / Pixel Watch:</b> in the Fitbit (Google Health) app → Connections or Settings → Health Connect → turn on syncing.</li>
+  <li>Then tap <b>Sync now</b>. Health Connect only shares the last 30 days with a newly connected app.</li></ul></details></section>`;
+}
+const HACT={
+  hcconnect:()=>hcConnect(),
+  hcsync:()=>hcSync(false,true),
+  hcoff:()=>hcDisconnect(),
+  hcsettings:async()=>{const H=await hp();if(H)try{await H.openHealthConnectSettings()}catch(e){toast('Couldn’t open Health Connect')}},
+};
+
 /* ---------- sign-in ---------- */
 let AU={step:'email',email:'',busy:false,err:''};
 function vAuth(){
@@ -1196,6 +1288,7 @@ function start(user){
   S.uid=user.id;S.email=user.email;
   STORE=createStore({uid:user.id,onChange:(what)=>{S.docs=STORE.docs;syncNote();if(what==='docs'){afterChange();render()}}});
   S.docs=STORE.docs;socialRealtime();route();loadSocial();
+  if(hcNative()){setTimeout(()=>hcSync(false),2500);import('@capacitor/app').then(({App})=>App.addListener('resume',()=>hcSync(false))).catch(()=>{})}
 }
 function webInstall(){
   if(isNative)return;
@@ -1234,7 +1327,7 @@ const ACT={
     }else openModal({kind:'food',tab:'quick',meal:e.meal,editId:e.id,quick:e});
   },
   delfood:el=>{const d=day(S.date);const i=d.foods.findIndex(x=>x.id===el.dataset.id);if(i<0)return;const [gone]=d.foods.splice(i,1);if(M)closeModal();put(dk(S.date),d);toast(`Removed ${gone.name}`)},
-  delex:el=>{const d=day(S.date);d.ex=d.ex.filter(x=>x.id!==el.dataset.id);put(dk(S.date),d)},
+  delex:el=>{const d=day(S.date);d.ex=d.ex.filter(x=>x.id!==el.dataset.id);put(dk(S.date),d);if(el.dataset.id.startsWith('hc-')){const h=Object.assign({ignored:[]},get('hc')||{});if(!h.ignored.includes(el.dataset.id)){h.ignored=h.ignored.concat([el.dataset.id]).slice(-500);put('hc',h)}}},
   addex:()=>openModal({kind:'ex'}),
   saveex:saveEx,
   water:el=>{const d=day(S.date),n=+el.dataset.n;d.water=d.water===n?n-1:n;put(dk(S.date),d)},
@@ -1257,7 +1350,7 @@ const ACT={
   delcustom:el=>{const doc=get('custom')||{foods:[]};doc.foods=doc.foods.filter(f=>f.id!==el.dataset.id);put('custom',doc);toast('Food deleted')},
   export:async()=>{const txt=JSON.stringify(S.docs,null,1);try{await navigator.clipboard.writeText(txt);toast('Copied your data to the clipboard')}catch(e){toast('Copy was blocked by the browser')}}
 };
-Object.assign(ACT,WACT,SACT,AACT);
+Object.assign(ACT,WACT,SACT,AACT,HACT);
 document.addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');
   if(!el){if(e.target.id==='modal')closeModal();return}
@@ -1283,9 +1376,10 @@ document.addEventListener('change',e=>{
   else if(id==='x-act')exCalc();
   else if(e.target.classList.contains('restsel')&&S.ws){S.ws.items[+e.target.dataset.i].rest=+e.target.value;saveWs()}
   else if(id==='wex'){S.wex=e.target.value;e.target.blur();render()}
+  else if(e.target.classList.contains('hctog')){const p=hcPrefs();p[e.target.dataset.k]=e.target.checked;setHcPrefs(p);if(e.target.checked)hcSync(true,true)}
   else if(e.target.classList.contains('sharetog')){const s=get('sharing')||{};s[e.target.dataset.k]=e.target.checked;put('sharing',s);toast('Sharing updated')}
   else if(id==='dpick'&&e.target.value){S.date=e.target.value;render()}
-  else if(id==='wt'){const v=parseFloat(e.target.value);const doc=get('weights')||{e:{}};doc.e=doc.e||{};if(isNaN(v)||v<=0)delete doc.e[S.date];else doc.e[S.date]=r2(wIn(v));e.target.blur();put('weights',doc);toast(isNaN(v)?'Weight cleared':'Weight logged')}
+  else if(id==='wt'){const v=parseFloat(e.target.value);const doc=get('weights')||{e:{}};doc.e=doc.e||{};if(isNaN(v)||v<=0)delete doc.e[S.date];else doc.e[S.date]=r2(wIn(v));if(doc.hc)delete doc.hc[S.date];e.target.blur();put('weights',doc);toast(isNaN(v)?'Weight cleared':'Weight logged')}
   else if(id==='s-units'){const im=e.target.value==='imperial',h=$('#s-h'),w=$('#s-w');const hv=parseFloat(h.value),wv=parseFloat(w.value);
     if(!isNaN(hv))h.value=(im?hv/2.54:hv*2.54).toFixed(1);if(!isNaN(wv))w.value=(im?wv*2.20462:wv/2.20462).toFixed(1);$('#u-h').textContent=im?'in':'cm';$('#u-w').textContent=im?'lb':'kg'}
 });
