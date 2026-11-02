@@ -325,7 +325,7 @@ function openModal(st){M=st;$('#modal').hidden=false;drawModal();document.body.s
 function closeModal(){M=null;$('#modal').hidden=true;$('#modal').innerHTML='';document.body.style.overflow=''}
 function drawModal(focus){
   if(!M)return;
-  $('#modal').innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="${M.kind==='ex'?'Add exercise':M.kind==='routine'?'Routine':M.kind==='pick'?'Pick exercise':M.kind==='summary'?'Workout summary':'Add food'}">${M.kind==='ex'?exBody():M.kind==='routine'?routineBody():M.kind==='pick'?pickerBody():M.kind==='summary'?summaryBody():M.kind==='newchat'?newChatBody():M.kind==='newchal'?newChalBody():M.kind==='import'?importBody():foodBody()}</div>`;
+  $('#modal').innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="${M.kind==='ex'?'Add exercise':M.kind==='routine'?'Routine':M.kind==='pick'?'Pick exercise':M.kind==='summary'?'Workout summary':'Add food'}">${M.kind==='ex'?exBody():M.kind==='round'?roundBody():M.kind==='routine'?routineBody():M.kind==='pick'?pickerBody():M.kind==='summary'?summaryBody():M.kind==='newchat'?newChatBody():M.kind==='newchal'?newChalBody():M.kind==='import'?importBody():foodBody()}</div>`;
   const f=$('#modal [autofocus]');if(f&&focus!==false)f.focus();
 }
 const mealName=k=>(MEALS.find(m=>m[0]===k)||MEALS[3])[1];
@@ -729,10 +729,10 @@ function vWorkouts(){
   const tab=S.wtab||'start';
   let h=`<div class="datebar"><h2>Workouts</h2><div class="seg-ctl" role="group">${[['start','Start'],['history','History'],['progress','Progress']].map(([k,l])=>`<button class="${tab===k?'on':''}" data-act="wtab" data-t="${k}">${l}</button>`).join('')}</div></div>`;
   if(tab==='start'){
-    h+=`<div class="grid"><div class="stack"><section class="card"><div class="spread"><h3 style="font-size:18px">Your routines</h3><span class="row"><button class="btn sm" data-act="newint">+ Interval timer</button><button class="btn sm primary" data-act="newroutine">+ New routine</button></span></div>`;
+    h+=`<div class="grid"><div class="stack"><section class="card"><div class="spread"><h3 style="font-size:18px">Your routines</h3><span class="row"><button class="btn sm" data-act="newround">⏱ Round clock</button><button class="btn sm" data-act="newint">+ Interval timer</button><button class="btn sm primary" data-act="newroutine">+ New routine</button></span></div>`;
     if(!rts.length)h+=`<p class="faint" style="margin:12px 0 0">No routines yet. Build one — like “Push day” or “5k easy run” — and start it with one tap. Or start an empty workout and add exercises as you go.</p>`;
-    h+=`<div class="rlist">${rts.map(r=>{const sub=r.kind==='int'?`${r.int.rounds} rounds · ${r.int.work}s work / ${r.int.rest}s rest`:r.items.map(t=>exById(t.ex).name).slice(0,4).join(', ')+(r.items.length>4?` +${r.items.length-4} more`:'');
-      return `<div class="rrow"><div class="t"><div class="nm">${esc(r.name)}${r.kind==='int'?' <span class="tag">Intervals</span>':''}</div><div class="sub">${esc(sub)||'Empty'}</div></div><button class="btn ghost sm" data-act="editroutine" data-id="${r.id}">Edit</button><button class="btn sm primary" data-act="startroutine" data-id="${r.id}">Start</button></div>`}).join('')}</div>
+    h+=`<div class="rlist">${rts.map(r=>{const sub=r.kind==='int'?(r.int.style==='round'?`${r.int.rounds} rounds · ${mmss(r.int.work)} / ${mmss(r.int.rest)} rest`:`${r.int.rounds} rounds · ${r.int.work}s work / ${r.int.rest}s rest`):r.items.map(t=>exById(t.ex).name).slice(0,4).join(', ')+(r.items.length>4?` +${r.items.length-4} more`:'');
+      return `<div class="rrow"><div class="t"><div class="nm">${esc(r.name)}${r.kind==='int'?(r.int.style==='round'?' <span class="tag">Round clock</span>':' <span class="tag">Intervals</span>'):''}</div><div class="sub">${esc(sub)||'Empty'}</div></div><button class="btn ghost sm" data-act="editroutine" data-id="${r.id}">Edit</button><button class="btn sm primary" data-act="startroutine" data-id="${r.id}">Start</button></div>`}).join('')}</div>
       <div style="margin-top:14px"><button class="btn" data-act="startempty">Start an empty workout</button></div></section></div>`;
     // this week summary
     const wkStart=addDays(today(),-((new Date(today()+'T12:00').getDay()+6)%7));
@@ -832,7 +832,7 @@ function wsInput(el){
 function finishWorkout(){
   const w=S.ws,end=Date.now(),durMin=Math.max(1,(end-w.start)/60000),kg=targets(today()).w;
   let kcal=0,vol=0;const items=[];const prs=[];
-  if(w.kind==='int'){const I=w.int;const done=intDoneSeconds();kcal=8*kg*done/3600;
+  if(w.kind==='int'){const I=w.int;const done=intDoneSeconds();kcal=(I.style==='round'?7.8:8)*kg*done/3600;keepAwake(false);
     var rec={id:newId(),date:today(),name:w.name,routineId:w.routineId,start:w.start,end,durMin:Math.max(1,done/60),kcal:Math.round(kcal),items:[],int:I,prs:[]};}
   else{
     let cardioMin=0;
@@ -857,33 +857,79 @@ function finishWorkout(){
 }
 function showSummary(rec){openModal({kind:'summary',rec})}
 function summaryBody(){const r=M.rec;return `<div class="sheet-h"><h3>Workout complete 🎉</h3><button class="x" data-act="close" aria-label="Close">×</button></div><div class="sheet-b">
-  <div class="tiles" style="grid-template-columns:repeat(3,1fr)"><div class="tile"><div class="l">Time</div><div class="v">${Math.round(r.durMin)}<span class="faint" style="font-size:14px"> min</span></div></div><div class="tile"><div class="l">Calories</div><div class="v">${r.kcal}</div></div><div class="tile"><div class="l">${r.volume?'Volume':'Exercises'}</div><div class="v">${r.volume?Math.round(wOut(r.volume)).toLocaleString():r.items.length}${r.volume?`<span class="faint" style="font-size:14px"> ${wU()}</span>`:''}</div></div></div>
+  <div class="tiles" style="grid-template-columns:repeat(3,1fr)"><div class="tile"><div class="l">Time</div><div class="v">${Math.round(r.durMin)}<span class="faint" style="font-size:14px"> min</span></div></div><div class="tile"><div class="l">Calories</div><div class="v">${r.kcal}</div></div><div class="tile"><div class="l">${r.int?'Rounds':r.volume?'Volume':'Exercises'}</div><div class="v">${r.int?r.int.rounds:r.volume?Math.round(wOut(r.volume)).toLocaleString():r.items.length}${r.volume?`<span class="faint" style="font-size:14px"> ${wU()}</span>`:''}</div></div></div>
   ${r.prs.length?`<h3 class="minih">New personal records</h3>${r.prs.map(x=>`<div class="rrow"><div class="t"><div class="nm">🏅 ${esc(exById(x.ex).name)}</div><div class="sub">${esc(prText(x))}</div></div></div>`).join('')}`:''}
   <p class="faint" style="margin-top:12px">Added to today’s diary under Exercise (${r.kcal} kcal).</p>
   <div class="row" style="justify-content:flex-end">${r.routineId?'':`<button class="btn" data-act="saveasroutine" data-id="${r.id}">Save as routine</button>`}<button class="btn primary" data-act="close">Done</button></div></div>`}
 
 /* ---------- interval timer ---------- */
-function intPlan(I){const p=[];if(+I.warm)p.push(['Warm-up',+I.warm]);for(let r=1;r<=+I.rounds;r++){p.push(['Work',+I.work,r]);if(r<+I.rounds||+I.cool===0)if(+I.rest)p.push(['Rest',+I.rest,r])}if(+I.cool)p.push(['Cool-down',+I.cool]);return p}
+// Interval timers and the round clock share one engine. Round clock = int with style 'round' (bell, warning knock, Get ready / Round / Rest).
+function intPlan(I){const R=I.style==='round',p=[];
+  if(+I.warm)p.push([R?'Get ready':'Warm-up',+I.warm]);
+  for(let r=1;r<=+I.rounds;r++){p.push([R?'Round':'Work',+I.work,r]);if(r<+I.rounds||(!R&&+I.cool===0))if(+I.rest)p.push(['Rest',+I.rest,r])}
+  if(+I.cool&&!R)p.push(['Cool-down',+I.cool]);return p}
 function intDoneSeconds(){const w=S.ws,p=intPlan(w.int);let s=0;for(let i=0;i<Math.min(w.step,p.length);i++)s+=p[i][1];return s+(w.step<p.length?curPhaseElapsed():0)}
 function curPhaseElapsed(){const w=S.ws;return w.elapsedPhase+(w.paused||!w.phaseStart?0:(Date.now()-w.phaseStart)/1000)}
+const RING_R=118,RING_C=2*Math.PI*RING_R;
+function phaseClass(ph,left,I){if(!ph)return 'done';const n=ph[0].toLowerCase().replace(/[^a-z]/g,'');return n+(I.style==='round'&&n==='round'&&+I.warn&&left<=+I.warn?' warn':'')}
 function vInterval(){
-  const w=S.ws,p=intPlan(w.int),ph=p[w.step];
-  const left=ph?ph[1]-curPhaseElapsed():0;const total=p.reduce((a,x)=>a+x[1],0);
+  const w=S.ws,I=w.int,p=intPlan(I),ph=p[w.step],R=I.style==='round';
+  const el=ph?curPhaseElapsed():0,left=ph?ph[1]-el:0,frac=ph?Math.min(1,el/ph[1]):1;
+  const next=p[w.step+1];
   return `<div class="datebar"><h2>${esc(w.name)}</h2><button class="btn ghost" data-act="wsdiscard">Discard</button><button class="btn primary" data-act="wsfinish">Finish</button></div>
-  <section class="card intv ${ph?ph[0].toLowerCase().replace(/[^a-z]/g,''):''}"><div class="phase" id="int-phase">${ph?esc(ph[0])+(ph[2]?` · round ${ph[2]} of ${w.int.rounds}`:''):'Done!'}</div>
-  <div class="big" id="int-left">${mmss(left)}</div>
-  <div class="track" style="height:10px;margin:14px 0"><i id="int-prog" style="width:${Math.min(100,intDoneSeconds()/total*100)}%;background:var(--accent)"></i></div>
-  <div class="faint" id="int-next">${p[w.step+1]?'Next: '+esc(p[w.step+1][0])+' '+mmss(p[w.step+1][1]):''}</div>
-  <div class="row" style="justify-content:center;margin-top:16px">${ph?`<button class="btn primary" data-act="intpause" style="min-width:120px">${w.paused?(w.phaseStart||w.elapsedPhase?'Resume':'Start'):'Pause'}</button><button class="btn" data-act="intskip">Skip phase</button>`:''}</div></section>`;
+  <section class="card intv ${phaseClass(ph,left,I)}" id="intv">
+    <div class="clock" role="timer" aria-live="off">
+      <svg viewBox="0 0 280 280" aria-hidden="true"><circle class="ctrack" cx="140" cy="140" r="${RING_R}"/><circle class="cprog" id="int-ring" cx="140" cy="140" r="${RING_R}" stroke-dasharray="${RING_C}" stroke-dashoffset="${RING_C*frac}"/></svg>
+      <div class="cface"><div class="phase" id="int-phase">${ph?esc(ph[0]):'Done!'}</div><div class="big" id="int-left">${mmss(Math.ceil(left))}</div>
+      <div class="rnd" id="int-round">${ph&&ph[2]?`${R?'':'Round '}${ph[2]} <span>of ${I.rounds}</span>`:ph?'':`${I.rounds} ${R?'rounds':'rounds'} done`}</div></div>
+    </div>
+    <div class="faint" id="int-next">${next?'Next: '+esc(next[0])+(next[2]&&next[0]!=='Rest'?' '+next[2]:'')+' · '+mmss(next[1]):ph?'Last one!':''}</div>
+    <div class="row" style="justify-content:center;margin-top:16px">${ph?`<button class="btn primary" data-act="intpause" style="min-width:130px">${w.paused?(w.phaseStart||w.elapsedPhase?'Resume':'Start'):'Pause'}</button><button class="btn" data-act="intskip">Skip</button>`:'<button class="btn primary" data-act="wsfinish">Save workout</button>'}</div>
+  </section>`;
 }
+/* sounds: synthesized boxing bell and wooden "clapper" knock */
+function bell(times,gap){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();for(let i=0;i<(times||1);i++){const t0=AC.currentTime+i*(gap||.32);
+  [[880,1],[1320,.5],[2210,.3],[3010,.18]].forEach(([f,a])=>{const o=AC.createOscillator(),g=AC.createGain();o.type='sine';o.frequency.value=f;o.connect(g);g.connect(AC.destination);g.gain.setValueAtTime(.0001,t0);g.gain.exponentialRampToValueAtTime(.25*a,t0+.01);g.gain.exponentialRampToValueAtTime(.0001,t0+1.6);o.start(t0);o.stop(t0+1.7)})}}catch(e){}}
+function clapper(n){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();for(let i=0;i<(n||2);i++){const t0=AC.currentTime+i*.18;const o=AC.createOscillator(),g=AC.createGain();o.type='triangle';o.frequency.setValueAtTime(1900,t0);o.frequency.exponentialRampToValueAtTime(700,t0+.05);o.connect(g);g.connect(AC.destination);g.gain.setValueAtTime(.35,t0);g.gain.exponentialRampToValueAtTime(.0001,t0+.08);o.start(t0);o.stop(t0+.1)}}catch(e){}}
+/* keep the screen on while a timer runs */
+let wakeLock=null;
+async function keepAwake(on){try{if(on&&!wakeLock&&navigator.wakeLock){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null})}else if(!on&&wakeLock){await wakeLock.release();wakeLock=null}}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&S.ws&&S.ws.kind==='int'&&!S.ws.paused)keepAwake(true)});
 function intTick(){
-  const w=S.ws,p=intPlan(w.int);if(w.paused||w.step>=p.length)return;
+  const w=S.ws,I=w.int,R=I.style==='round',p=intPlan(I);if(w.paused||w.step>=p.length)return;
   const ph=p[w.step],el=curPhaseElapsed(),left=ph[1]-el;
-  if(left<=3.05&&left>0&&Math.floor(left)!==w._lastBeep){if(w._lastBeep==null)duck(4500);w._lastBeep=Math.floor(left);beep(660,.12)}
-  if(left<=0){w.step++;w.elapsedPhase=0;w.phaseStart=Date.now();w._lastBeep=null;duck(1200);beep(w.step<p.length&&p[w.step][0]==='Work'?1040:520,.35);saveWs();if(w.step>=p.length){w.paused=true;toast('Intervals complete!')}render();return}
-  const a=$('#int-left');if(a)a.textContent=mmss(left);const pr=$('#int-prog');if(pr)pr.style.width=Math.min(100,intDoneSeconds()/p.reduce((x,y)=>x+y[1],0)*100)+'%';
+  if(R){ // warning knock near the end of each round; 3-2-1 beeps while getting ready
+    if(ph[0]==='Round'&&+I.warn&&left<=+I.warn&&left>+I.warn-1&&w._warned!==w.step){w._warned=w.step;duck(1500);clapper(3)}
+    if(ph[0]!=='Round'&&left<=3.05&&left>0&&Math.floor(left)!==w._lastBeep){if(w._lastBeep==null)duck(4500);w._lastBeep=Math.floor(left);beep(660,.12)}
+  }else if(left<=3.05&&left>0&&Math.floor(left)!==w._lastBeep){if(w._lastBeep==null)duck(4500);w._lastBeep=Math.floor(left);beep(660,.12)}
+  if(left<=0){w.step++;w.elapsedPhase=0;w.phaseStart=Date.now();w._lastBeep=null;
+    const nx=p[w.step];
+    if(R){duck(2500);if(!nx)bell(3,.35);else if(nx[0]==='Round')bell(1);else bell(2,.3)}
+    else{duck(1200);beep(nx&&nx[0]==='Work'?1040:520,.35)}
+    saveWs();if(w.step>=p.length){w.paused=true;keepAwake(false);toast(R?'Final bell! 🥊':'Intervals complete!')}render();return}
+  const a=$('#int-left');if(a)a.textContent=mmss(Math.ceil(left));
+  const rg=$('#int-ring');if(rg)rg.setAttribute('stroke-dashoffset',RING_C*Math.min(1,el/ph[1]));
+  const card=$('#intv');if(card){const c='card intv '+phaseClass(ph,left,I);if(card.className!==c)card.className=c}
 }
-
+/* round clock setup */
+const ROUND_PRESETS=[['Boxing',{work:180,rest:60,rounds:12}],['Amateur boxing',{work:180,rest:60,rounds:3}],['MMA',{work:300,rest:60,rounds:5}],['Muay Thai',{work:180,rest:120,rounds:5}],['Kickboxing',{work:120,rest:60,rounds:3}],['Bag work',{work:180,rest:30,rounds:6}]];
+const parseMS=v=>{v=String(v||'').trim();if(/^\d+:\d{1,2}$/.test(v)){const [m,s2]=v.split(':').map(Number);return m*60+s2}const n=parseFloat(v);return isNaN(n)?0:Math.round(n*60)};
+function roundBody(){const r=M.r,I=r.int;
+  return `<div class="sheet-h"><h3>${M.isNew?'Round clock':'Edit round clock'}</h3><button class="x" data-act="close" aria-label="Close">×</button></div><div class="sheet-b">
+  <div class="chips">${ROUND_PRESETS.map(([n,v])=>`<button class="chip ${r.name===n?'on':''}" data-act="rpreset" data-n="${esc(n)}">${esc(n)}<small>${v.rounds} × ${mmss(v.work)}</small></button>`).join('')}</div>
+  <label class="field" style="margin-top:12px">Name<input id="r-name" class="inp" value="${esc(r.name)}"></label>
+  <div class="fgrid" style="margin-top:12px">
+    <label class="field">Round length (min:sec)<input class="inp" id="rc-work" inputmode="numeric" value="${mmss(I.work)}"></label>
+    <label class="field">Rest (min:sec)<input class="inp" id="rc-rest" inputmode="numeric" value="${mmss(I.rest)}"></label>
+    <label class="field">Rounds<input class="inp" id="rc-rounds" type="number" min="1" max="50" value="${I.rounds}"></label>
+    <label class="field">Get ready (sec)<input class="inp" id="rc-warm" type="number" min="0" max="120" value="${I.warm}"></label>
+    <label class="field">Warning knock (sec before end)<input class="inp" id="rc-warn" type="number" min="0" max="60" value="${I.warn}"></label>
+  </div>
+  <p class="faint" id="rc-total">Total: ${mmss(intPlan(I).reduce((a,x)=>a+x[1],0))} · bell starts and ends each round${+I.warn?`, knock ${I.warn}s before the end`:''}</p>
+  <div class="row" style="justify-content:flex-end">${M.isNew?'':'<button class="btn ghost" data-act="delroutine">Delete</button>'}<button class="btn" data-act="saveroutine">Save to routines</button><button class="btn primary" data-act="rcstart">Start</button></div></div>`}
+function readRound(){if(!M||!M.r||M.r.int.style!=='round')return;const I=M.r.int,n=$('#r-name');if(n)M.r.name=n.value;
+  const g=id=>{const e=$('#'+id);return e?e.value:null};
+  if(g('rc-work')!=null){I.work=Math.max(5,parseMS(g('rc-work')));I.rest=Math.max(0,parseMS(g('rc-rest')));I.rounds=Math.max(1,Math.min(50,parseInt(g('rc-rounds'))||1));I.warm=Math.max(0,parseInt(g('rc-warm'))||0);I.warn=Math.max(0,Math.min(I.work-1,parseInt(g('rc-warn'))||0))}}
 /* ---------- routine editor (modal) ---------- */
 function routineBody(){
   const r=M.r;
@@ -918,7 +964,7 @@ function pickList(groups){const ks=Object.keys(groups);if(!ks.length)return '<di
 function readRoutineInputs(){if(!M||!M.r)return;const n=$('#r-name');if(n)M.r.name=n.value;
   document.querySelectorAll('[data-rk]').forEach(el=>{const t=M.r.items[+el.dataset.ri],k=el.dataset.rk,v=parseFloat(el.value);t[k]=isNaN(v)?'':(k==='wt'?r2(wIn(v)):k==='dist'?r2(dIn(v)):v)});
   document.querySelectorAll('[data-ik]').forEach(el=>{const v=parseFloat(el.value);M.r.int[el.dataset.ik]=isNaN(v)?0:Math.max(0,Math.round(v))})}
-function saveRoutine(){readRoutineInputs();const r=M.r;if(!r.name.trim()){toast('Give the routine a name');return}
+function saveRoutine(){readRoutineInputs();readRound();const r=M.r;if(!r.name.trim()){toast('Give the routine a name');return}
   if(r.kind!=='int'&&!r.items.length){toast('Add at least one exercise');return}
   if(r.kind==='int'&&(!r.int.work||!r.int.rounds)){toast('Set work time and rounds');return}
   const doc=get('routines')||{list:[]};doc.list=doc.list||[];const i=doc.list.findIndex(x=>x.id===r.id);if(i>=0)doc.list[i]=r;else doc.list.push(r);
@@ -928,7 +974,10 @@ const WACT={
   wtab:el=>{S.wtab=el.dataset.t;render()},
   newroutine:()=>openModal({kind:'routine',isNew:true,r:{id:'r'+newId(),name:'',kind:'std',items:[]}}),
   newint:()=>openModal({kind:'routine',isNew:true,r:{id:'r'+newId(),name:'Intervals',kind:'int',int:{warm:120,work:40,rest:20,rounds:8,cool:120}}}),
-  editroutine:el=>{const r=routines().find(x=>x.id===el.dataset.id);if(r)openModal({kind:'routine',r:clone(r)})},
+  editroutine:el=>{const r=routines().find(x=>x.id===el.dataset.id);if(r)openModal({kind:r.int&&r.int.style==='round'?'round':'routine',r:clone(r)})},
+  newround:()=>openModal({kind:'round',isNew:true,r:{id:'r'+newId(),name:'Boxing',kind:'int',int:{style:'round',warm:10,work:180,rest:60,rounds:12,warn:10,cool:0}}}),
+  rpreset:el=>{readRound();const pr=ROUND_PRESETS.find(x=>x[0]===el.dataset.n);if(!pr)return;M.r.name=pr[0];Object.assign(M.r.int,pr[1]);drawModal(false)},
+  rcstart:()=>{readRound();const r=clone(M.r);closeModal();startWorkout(r);if(!S.ws||S.ws.routineId!==r.id)return;S.ws.paused=false;S.ws.phaseStart=Date.now();bell(1);keepAwake(true);saveWs();render()},
   startroutine:el=>{const r=routines().find(x=>x.id===el.dataset.id);if(r)startWorkout(r)},
   startempty:()=>startWorkout(null),
   radd:()=>{readRoutineInputs();M.pick='routine';M.pq='';drawModal()},
@@ -956,7 +1005,7 @@ const WACT={
   restskip:()=>{S.rest=null;render()},
   wsfinish:()=>{if(S.ws.kind!=='int'&&!S.ws.items.some(it=>it.sets.some(s=>s.done))){toast('Tick off at least one set (✓) before finishing');return}finishWorkout()},
   wsdiscard:()=>{if(!confirmReplace())return;S.ws=null;S.rest=null;saveWs();render();toast('Workout discarded')},
-  intpause:()=>{const w=S.ws;beep(1,.01);if(w.paused){w.paused=false;w.phaseStart=Date.now()}else{w.elapsedPhase=curPhaseElapsed();w.paused=true}saveWs();render()},
+  intpause:()=>{const w=S.ws;beep(1,.01);if(w.paused){const first=!w.phaseStart&&!w.elapsedPhase;w.paused=false;w.phaseStart=Date.now();keepAwake(true);if(first&&w.int.style==='round'&&!+w.int.warm)bell(1)}else{w.elapsedPhase=curPhaseElapsed();w.paused=true;keepAwake(false)}saveWs();render()},
   intskip:()=>{const w=S.ws;w.step++;w.elapsedPhase=0;w.phaseStart=Date.now();saveWs();render()},
   saveasroutine:el=>{const w=allWorkouts().find(x=>x.id===el.dataset.id);if(!w)return;const r=w.int?{id:'r'+newId(),name:w.name,kind:'int',int:Object.assign({},w.int)}:{id:'r'+newId(),name:w.name,kind:'std',items:w.items.map(it=>{const ex=exById(it.ex),s=it.sets[0]||{};return ex.kind==='c'?{ex:it.ex,min:s.t?Math.round(s.t/60):30,dist:s.d||''}:ex.kind==='t'?{ex:it.ex,sets:it.sets.length,secs:s.t,rest:60}:{ex:it.ex,sets:it.sets.length,reps:s.r,wt:s.w,rest:90}})};
     if(M)closeModal();openModal({kind:'routine',isNew:true,r})},
@@ -1447,6 +1496,7 @@ document.addEventListener('input',e=>{
   else if(id==='ws-name'&&S.ws){S.ws.name=e.target.value;saveWs()}
   else if(e.target.classList.contains('si')&&S.ws)wsInput(e.target);
   else if(id==='pq'&&M){M.pq=e.target.value;const q=M.pq.toLowerCase(),g={};for(const x of exList())if(!q||(x.name+' '+x.group).toLowerCase().includes(q))(g[x.group]=g[x.group]||[]).push(x);$('#pres').innerHTML=pickList(g)}
+  else if(/^rc-/.test(id)&&M&&M.kind==='round'){readRound();const t=$('#rc-total');if(t)t.textContent='Total: '+mmss(intPlan(M.r.int).reduce((a,x)=>a+x[1],0))+' · bell starts and ends each round'+(+M.r.int.warn?`, knock ${M.r.int.warn}s before the end`:'')}
   else if(e.target.dataset.ik!==undefined&&M&&M.r){readRoutineInputs();const t=$('#int-total');if(t)t.textContent='Total: '+mmss(intPlan(M.r.int).reduce((a,x)=>a+x[1],0))}
 });
 document.addEventListener('change',e=>{

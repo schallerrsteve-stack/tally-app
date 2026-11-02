@@ -278,3 +278,25 @@ a{color:var(--accent)}
   nav a{text-align:center;padding:7px 4px;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .datebar input[type=date]{flex:1;min-width:0}
 }
+
+/* round clock / interval timer */
+.intv{text-align:center;max-width:560px;margin:0 auto;padding:22px 18px 24px}
+.clock{position:relative;width:min(82vw,330px);aspect-ratio:1;margin:0 auto 10px}
+.clock svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ctrack{fill:none;stroke:var(--soft);stroke-width:16}
+.cprog{fill:none;stroke:var(--accent);stroke-width:16;stroke-linecap:round;transition:stroke-dashoffset .25s linear,stroke .3s}
+.cface{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.intv .phase{font-size:15px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink2);font-weight:700}
+.intv .big{font-family:Fraunces,serif;font-size:clamp(56px,18vw,84px);font-weight:650;line-height:1.05;font-variant-numeric:tabular-nums}
+.intv .rnd{font-size:18px;font-weight:700;color:var(--ink)}.intv .rnd span{color:var(--ink3);font-weight:500}
+.intv.round .cprog,.intv.work .cprog{stroke:var(--c)}
+.intv.rest .cprog{stroke:var(--p)}
+.intv.getready .cprog,.intv.warmup .cprog,.intv.cooldown .cprog{stroke:var(--f)}
+.intv.warn .cprog{stroke:#d9a400}
+.intv.warn{animation:warnpulse 1s ease-in-out infinite}
+@keyframes warnpulse{50%{box-shadow:0 0 0 6px color-mix(in srgb,#d9a400 35%,transparent)}}
+.intv.round,.intv.work{border-color:var(--c);box-shadow:none}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:7px 12px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;font-weight:500}
+.chip small{font-weight:400;color:var(--ink3);font-size:12px}
+.chip.on{border-color:var(--accent);background:var(--accent-soft)}
