@@ -26,6 +26,7 @@ jobs:
       - name: Build web app
         run: npm run build
         env:
+          TALLY_BUILD: web
           VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://rwodweszrlvjgxgtpvxz.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'sb_publishable_QWCFBPRNjno3sVLe37CuSg_eDXZsJvZ' }}
       - uses: actions/configure-pages@v5

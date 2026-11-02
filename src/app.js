@@ -265,7 +265,8 @@ function vFoods(){
 function vProfile(){
   const p=profile(),{bmr,tdee,auto,w}=targets(today()),im=p.units==='imperial';
   const opt=(arr,v)=>arr.map(([val,l])=>`<option value="${val}" ${+val===+v?'selected':''}>${esc(l)}</option>`).join('');
-  return `<div class="datebar"><h2>Profile &amp; targets</h2></div>
+  return `<div class="datebar"><h2>Settings</h2></div>
+  <h3 class="sech">Profile &amp; targets</h3>
   <div class="grid"><section class="card"><form id="pform" class="stack" style="gap:14px" onsubmit="return false">
     <div class="fgrid">
       <label class="field">Units<select id="s-units"><option value="metric" ${!im?'selected':''}>Metric (kg, cm)</option><option value="imperial" ${im?'selected':''}>Imperial (lb, in)</option></select></label>
@@ -299,8 +300,8 @@ function vProfile(){
     </div>
     <p class="faint" style="margin-top:12px">Nutrient targets (fiber, potassium, calcium, iron, vitamin C) follow the US/Canadian Dietary Reference Intakes for your age and sex; sodium uses the 2,300 mg upper limit. These are general guidelines, not medical advice.</p>
   </section>
-  ${hcCard()}<section class="card"><h3 style="font-size:18px">Your account</h3><p class="muted" style="font-size:14px">Signed in as <b>${esc(S.email||'')}</b>. Your diary is private to you and syncs across your devices.</p>
-  <div class="row"><button class="btn sm" data-act="export">Copy all data as JSON</button><button class="btn sm" data-act="importopen">Import from Tally web</button><button class="btn sm ghost" data-act="signout">Sign out</button></div><details style="margin-top:12px"><summary>Delete my account</summary><p class="faint">Permanently deletes your account, diary, workouts, messages and achievements. This can’t be undone.</p><button class="btn sm" data-act="delacct" style="color:var(--warn)">Delete everything</button></details></section></div></div>`;
+  <h3 class="sech">Watch &amp; apps</h3>${hcCard()}<h3 class="sech">Account</h3><section class="card"><h3 style="font-size:18px">Your account</h3><p class="muted" style="font-size:14px">Signed in as <b>${esc(S.email||'')}</b>. Your diary is private to you and syncs across your devices.</p>
+  <div class="row"><button class="btn sm" data-act="export">Copy all data as JSON</button><button class="btn sm" data-act="importopen">Import from Tally web</button><button class="btn sm ghost" data-act="signout">Sign out</button></div><details style="margin-top:12px"><summary>Delete my account</summary><p class="faint">Permanently deletes your account, diary, workouts, messages and achievements. This can’t be undone.</p><button class="btn sm" data-act="delacct" style="color:var(--warn)">Delete everything</button></details></section><h3 class="sech">About</h3>${aboutCard()}</div></div>`;
 }
 function saveProfile(){
   const im=$('#s-units').value==='imperial',num=id=>parseFloat($(id).value);
@@ -1165,6 +1166,34 @@ const SACT={
 };
 
 
+
+/* ---------- about / version ---------- */
+const VER=__TALLY_VERSION__;
+const verLabel=()=>`Version ${VER.version}`+(VER.build&&VER.build!=='dev'&&VER.build!=='web'?` (build ${VER.build})`:VER.build==='web'?' (web)':' (dev)');
+S.upd=null;
+async function checkUpdate(manual){
+  if(!isNative||!/^\d+$/.test(String(VER.build))){if(manual)toast(isNative?'This is a development build':'The web version updates itself automatically');return}
+  try{const r=await fetch('https://api.github.com/repos/schallerrsteve-stack/tally-app/releases/latest',{headers:{Accept:'application/vnd.github+json'}});if(!r.ok)throw new Error(r.status);
+    const j=await r.json();const latest=parseInt(String(j.tag_name||'').replace(/\D/g,''),10)||0;
+    S.upd={latest,newer:latest>+VER.build,checked:Date.now()};
+    if(manual&&!S.upd.newer)toast('You have the latest version');
+  }catch(e){if(manual)toast('Couldn’t check for updates — try again later')}
+  render();
+}
+function aboutCard(){
+  const u=S.upd;
+  return `<section class="card"><h3 style="font-size:18px">About Tally</h3>
+  <div class="ptable" style="grid-template-columns:1fr">
+    <div><span>Version</span><span>${esc(verLabel())}</span></div>
+    <div><span>Built</span><span>${esc(new Date(VER.date).toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'}))} · ${esc(VER.commit)}</span></div>
+    <div><span>App</span><span>${isNative?'Android':'Web'}</span></div>
+  </div>
+  ${isNative?(u&&u.newer?`<div class="notice" style="margin-top:12px">Build ${u.latest} is available. <a class="btn sm primary" href="https://github.com/schallerrsteve-stack/tally-app/releases/latest/download/Tally.apk" style="margin-left:6px">Download update</a></div>`:`<div class="row" style="margin-top:12px"><button class="btn sm" data-act="chkupd">Check for updates</button>${u&&!u.newer?'<span class="faint">You’re up to date</span>':''}</div>`):'<p class="faint" style="margin-top:10px">The web version updates automatically when you reopen it.</p>'}
+  <p class="faint" style="margin-top:12px">Food data: Health Canada Canadian Nutrient File (2015), USDA National Nutrient Database (SR28), and <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL).
+  <br><a href="privacypolicy.html" target="_blank" rel="noopener">Privacy policy</a> · <a href="https://github.com/schallerrsteve-stack/tally-app/releases" target="_blank" rel="noopener">What’s new</a></p></section>`;
+}
+const VACT={chkupd:()=>checkUpdate(true)};
+
 /* ---------- music controls on workout screens (Android) ---------- */
 // Works like headphone buttons: controls whatever is playing (YouTube Music, Spotify, ...).
 const MC=()=>window.__tallyMediaMock||(isNative?MediaControl:null); // the mock is only used by automated tests
@@ -1291,7 +1320,7 @@ function vAuth(){
   :`<p style="margin:0 0 10px">We emailed a code to <b>${esc(AU.email)}</b>.</p><label class="field">Code<input id="au-code" class="inp" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456" autofocus></label>
   <button class="btn primary" data-act="auverify" style="width:100%;margin-top:12px" ${AU.busy?'disabled':''}>${AU.busy?'<span class="spin"></span> Checking…':'Sign in'}</button>
   <div class="row" style="justify-content:space-between;margin-top:10px"><button class="btn ghost sm" data-act="auback">Use a different email</button><button class="btn ghost sm" data-act="ausend">Resend code</button></div>`}
-  ${AU.err?`<div class="notice warn" style="margin-top:12px">${esc(AU.err)}</div>`:''}</div>`;
+  ${AU.err?`<div class="notice warn" style="margin-top:12px">${esc(AU.err)}</div>`:''}<p class="faint" style="text-align:center;margin:16px 0 0;font-size:12px">${esc(verLabel())}</p></div>`;
 }
 const AACT={
   ausend:async()=>{const e=($('#au-email')||{}).value;if(e!==undefined)AU.email=e.trim();if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(AU.email)){AU.err='Enter a valid email address';render();return}
@@ -1313,6 +1342,7 @@ function start(user){
   S.uid=user.id;S.email=user.email;
   STORE=createStore({uid:user.id,onChange:(what)=>{S.docs=STORE.docs;syncNote();if(what==='docs'){afterChange();render()}}});
   S.docs=STORE.docs;socialRealtime();route();loadSocial();
+  if(isNative)setTimeout(()=>checkUpdate(false),4000);
   if(hcNative()){setTimeout(()=>hcSync(false),2500);import('@capacitor/app').then(({App})=>App.addListener('resume',()=>hcSync(false))).catch(()=>{})}
 }
 function webInstall(){
@@ -1375,7 +1405,7 @@ const ACT={
   delcustom:el=>{const doc=get('custom')||{foods:[]};doc.foods=doc.foods.filter(f=>f.id!==el.dataset.id);put('custom',doc);toast('Food deleted')},
   export:async()=>{const txt=JSON.stringify(S.docs,null,1);try{await navigator.clipboard.writeText(txt);toast('Copied your data to the clipboard')}catch(e){toast('Copy was blocked by the browser')}}
 };
-Object.assign(ACT,WACT,SACT,AACT,HACT,MACT);
+Object.assign(ACT,WACT,SACT,AACT,HACT,MACT,VACT);
 document.addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');
   if(!el){if(e.target.id==='modal')closeModal();return}
