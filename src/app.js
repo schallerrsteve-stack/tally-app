@@ -726,6 +726,7 @@ function vWorkouts(){
   const tab=S.wtab||'start';
   let h=`<div class="datebar"><h2>Workouts</h2><div class="seg-ctl" role="group">${[['start','Start'],['history','History'],['progress','Progress']].map(([k,l])=>`<button class="${tab===k?'on':''}" data-act="wtab" data-t="${k}">${l}</button>`).join('')}</div></div>`;
   if(tab==='start'){
+    if(MC()){h+=musicBar();if(Date.now()-S.music.polled>3000){S.music.polled=Date.now();setTimeout(()=>musicCall('state'),0)}}
     h+=`<div class="grid"><div class="stack"><section class="card"><div class="spread"><h3 style="font-size:18px">Your routines</h3><span class="row"><button class="btn sm" data-act="newint">+ Interval timer</button><button class="btn sm primary" data-act="newroutine">+ New routine</button></span></div>`;
     if(!rts.length)h+=`<p class="faint" style="margin:12px 0 0">No routines yet. Build one — like “Push day” or “5k easy run” — and start it with one tap. Or start an empty workout and add exercises as you go.</p>`;
     h+=`<div class="rlist">${rts.map(r=>{const sub=r.kind==='int'?`${r.int.rounds} rounds · ${r.int.work}s work / ${r.int.rest}s rest`:r.items.map(t=>exById(t.ex).name).slice(0,4).join(', ')+(r.items.length>4?` +${r.items.length-4} more`:'');
@@ -1212,7 +1213,7 @@ function musicBar(){
 }
 function refreshMusicBar(){const el=document.querySelector('.musicbar');if(el){const t=document.createElement('div');t.innerHTML=musicBar();if(t.firstElementChild)el.replaceWith(t.firstElementChild)}}
 async function musicCall(fn,args){const m=MC();if(!m)return;try{const r=await m[fn](args||{});if(r&&typeof r.playing==='boolean')S.music.playing=r.playing}catch(e){if(fn!=='state')toast('Music controls aren’t available right now')}refreshMusicBar()}
-function musicPoll(){if(!MC()||!S.ws)return;if(Date.now()-S.music.polled<5000)return;S.music.polled=Date.now();musicCall('state')}
+function musicPoll(){if(!MC()||(!S.ws&&S.view!=='workouts'))return;if(Date.now()-S.music.polled<5000)return;S.music.polled=Date.now();musicCall('state')}
 let duckUntil=0;
 function duck(ms){const m=MC();if(!m||Date.now()<duckUntil)return;duckUntil=Date.now()+ms-200;m.duck({ms}).catch(()=>{})}
 const MACT={mprev:()=>musicCall('previous'),mnext:()=>musicCall('next'),mplay:()=>musicCall('playPause')};
