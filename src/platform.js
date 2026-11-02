@@ -1,6 +1,6 @@
 // Platform layer: Supabase auth + data sync, Claude proxy, Open Food Facts live lookup, native barcode scanning.
 import { createClient } from '@supabase/supabase-js';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 
 const SB_URL = import.meta.env.VITE_SUPABASE_URL;
 const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -167,3 +167,6 @@ export function upcEtoA(e) {
   else m = d[0] + d[1] + d[2] + d[3] + d[4] + '0000' + L;
   return n + m + cd;
 }
+
+/* ---------- music controls (custom Android plugin: MediaControlPlugin.java) ---------- */
+export const MediaControl = registerPlugin('MediaControl');

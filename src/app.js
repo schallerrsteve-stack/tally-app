@@ -1,4 +1,4 @@
-import { sb, isNative, currentUser, sendCode, verifyCode, signOut, createStore, sample, offProduct, offCached, offSearch, nativeScan } from './platform.js';
+import { MediaControl, sb, isNative, currentUser, sendCode, verifyCode, signOut, createStore, sample, offProduct, offCached, offSearch, nativeScan } from './platform.js';
 import './style.css';
 
 "use strict";
@@ -790,7 +790,7 @@ function exChart(id){
 /* ---------- live session ---------- */
 function vSession(){
   const w=S.ws,el=Math.round((Date.now()-w.start)/1000);
-  let h=`<div class="datebar"><h2><input id="ws-name" class="titleinp" value="${esc(w.name)}" aria-label="Workout name"></h2><span class="faint" id="ws-clock">${mmss(el)}</span><button class="btn ghost" data-act="wsdiscard">Discard</button><button class="btn primary" data-act="wsfinish">Finish</button></div><div class="stack" style="max-width:760px">`;
+  let h=`<div class="datebar"><h2><input id="ws-name" class="titleinp" value="${esc(w.name)}" aria-label="Workout name"></h2><span class="faint" id="ws-clock">${mmss(el)}</span><button class="btn ghost" data-act="wsdiscard">Discard</button><button class="btn primary" data-act="wsfinish">Finish</button></div>${musicBar()}<div class="stack" style="max-width:760px">`;
   w.items.forEach((it,ii)=>{const ex=exById(it.ex);const prev=lastSets(it.ex);
     const cols=ex.kind==='w'?[wU(),'Reps']:ex.kind==='bw'?['Reps','+'+wU()]:ex.kind==='t'?['Seconds']:['Minutes',distU()];
     h+=`<section class="card ses"><div class="spread"><h3 style="font-size:18px">${esc(ex.name)}</h3><span class="row"><span class="faint resttxt">${ex.kind==='c'?'':`Rest ${mmss(it.rest)}`}</span><button class="btn ghost sm" data-act="wsmove" data-i="${ii}" data-d="-1" aria-label="Move up">↑</button><button class="btn ghost sm" data-act="wsmove" data-i="${ii}" data-d="1" aria-label="Move down">↓</button><button class="x" data-act="wsrmex" data-i="${ii}" aria-label="Remove ${esc(ex.name)}">×</button></span></div>
@@ -814,8 +814,9 @@ let tick=null;
 function ensureTick(){if(tick)return;tick=setInterval(()=>{
   if(!S.ws){clearInterval(tick);tick=null;return}
   const c=$('#ws-clock');if(c)c.textContent=mmss((Date.now()-S.ws.start)/1000);
-  if(S.rest){const left=(S.rest.end-Date.now())/1000;const el=$('#rest-left');if(el)el.textContent=mmss(left);if(left<=0){beep(880,.25);setTimeout(()=>beep(880,.25),350);S.rest=null;const rb=$('#restbar');if(rb)rb.remove();toast('Rest is over — next set!')}}
+  if(S.rest){const left=(S.rest.end-Date.now())/1000;const el=$('#rest-left');if(el)el.textContent=mmss(left);if(left<=0){duck(1600);beep(880,.25);setTimeout(()=>beep(880,.25),350);S.rest=null;const rb=$('#restbar');if(rb)rb.remove();toast('Rest is over — next set!')}}
   if(S.ws.kind==='int')intTick();
+  musicPoll();
 },250)}
 let AC=null;
 function beep(f,d){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.frequency.value=f;o.connect(g);g.connect(AC.destination);g.gain.setValueAtTime(.2,AC.currentTime);g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+d);o.start();o.stop(AC.currentTime+d)}catch(e){}}
@@ -864,7 +865,7 @@ function curPhaseElapsed(){const w=S.ws;return w.elapsedPhase+(w.paused||!w.phas
 function vInterval(){
   const w=S.ws,p=intPlan(w.int),ph=p[w.step];
   const left=ph?ph[1]-curPhaseElapsed():0;const total=p.reduce((a,x)=>a+x[1],0);
-  return `<div class="datebar"><h2>${esc(w.name)}</h2><button class="btn ghost" data-act="wsdiscard">Discard</button><button class="btn primary" data-act="wsfinish">Finish</button></div>
+  return `<div class="datebar"><h2>${esc(w.name)}</h2><button class="btn ghost" data-act="wsdiscard">Discard</button><button class="btn primary" data-act="wsfinish">Finish</button></div>${musicBar()}
   <section class="card intv ${ph?ph[0].toLowerCase().replace(/[^a-z]/g,''):''}"><div class="phase" id="int-phase">${ph?esc(ph[0])+(ph[2]?` · round ${ph[2]} of ${w.int.rounds}`:''):'Done!'}</div>
   <div class="big" id="int-left">${mmss(left)}</div>
   <div class="track" style="height:10px;margin:14px 0"><i id="int-prog" style="width:${Math.min(100,intDoneSeconds()/total*100)}%;background:var(--accent)"></i></div>
@@ -874,8 +875,8 @@ function vInterval(){
 function intTick(){
   const w=S.ws,p=intPlan(w.int);if(w.paused||w.step>=p.length)return;
   const ph=p[w.step],el=curPhaseElapsed(),left=ph[1]-el;
-  if(left<=3.05&&left>0&&Math.floor(left)!==w._lastBeep){w._lastBeep=Math.floor(left);beep(660,.12)}
-  if(left<=0){w.step++;w.elapsedPhase=0;w.phaseStart=Date.now();w._lastBeep=null;beep(w.step<p.length&&p[w.step][0]==='Work'?1040:520,.35);saveWs();if(w.step>=p.length){w.paused=true;toast('Intervals complete!')}render();return}
+  if(left<=3.05&&left>0&&Math.floor(left)!==w._lastBeep){if(w._lastBeep==null)duck(4500);w._lastBeep=Math.floor(left);beep(660,.12)}
+  if(left<=0){w.step++;w.elapsedPhase=0;w.phaseStart=Date.now();w._lastBeep=null;duck(1200);beep(w.step<p.length&&p[w.step][0]==='Work'?1040:520,.35);saveWs();if(w.step>=p.length){w.paused=true;toast('Intervals complete!')}render();return}
   const a=$('#int-left');if(a)a.textContent=mmss(left);const pr=$('#int-prog');if(pr)pr.style.width=Math.min(100,intDoneSeconds()/p.reduce((x,y)=>x+y[1],0)*100)+'%';
 }
 
@@ -1163,6 +1164,30 @@ const SACT={
   chalresp:async el=>{await sb.from('challenge_participants').update({status:el.dataset.s}).eq('challenge_id',el.dataset.id).eq('user_id',S.uid);await loadChallenges();render()},
 };
 
+
+/* ---------- music controls on workout screens (Android) ---------- */
+// Works like headphone buttons: controls whatever is playing (YouTube Music, Spotify, ...).
+const MC=()=>window.__tallyMediaMock||(isNative?MediaControl:null); // the mock is only used by automated tests
+S.music={playing:null,polled:0};
+const ICO={prev:'<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2v14H6zM20 5v14L9.5 12z" fill="currentColor"/></svg>',
+  next:'<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h2v14h-2zM4 5v14l10.5-7z" fill="currentColor"/></svg>',
+  play:'<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor"/></svg>',
+  pause:'<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z" fill="currentColor"/></svg>'};
+function musicBar(){
+  if(!MC())return '';const p=S.music.playing;
+  return `<div class="musicbar" role="group" aria-label="Music controls"><span class="ml">Music</span>
+  <button class="mb" data-act="mprev" aria-label="Previous song">${ICO.prev}</button>
+  <button class="mb big" data-act="mplay" aria-label="${p?'Pause music':'Play music'}">${p?ICO.pause:ICO.play}</button>
+  <button class="mb" data-act="mnext" aria-label="Next song">${ICO.next}</button>
+  <span class="faint ms">${p===true?'Playing':p===false?'Paused':''}</span></div>`;
+}
+function refreshMusicBar(){const el=document.querySelector('.musicbar');if(el){const t=document.createElement('div');t.innerHTML=musicBar();if(t.firstElementChild)el.replaceWith(t.firstElementChild)}}
+async function musicCall(fn,args){const m=MC();if(!m)return;try{const r=await m[fn](args||{});if(r&&typeof r.playing==='boolean')S.music.playing=r.playing}catch(e){if(fn!=='state')toast('Music controls aren’t available right now')}refreshMusicBar()}
+function musicPoll(){if(!MC()||!S.ws)return;if(Date.now()-S.music.polled<5000)return;S.music.polled=Date.now();musicCall('state')}
+let duckUntil=0;
+function duck(ms){const m=MC();if(!m||Date.now()<duckUntil)return;duckUntil=Date.now()+ms-200;m.duck({ms}).catch(()=>{})}
+const MACT={mprev:()=>musicCall('previous'),mnext:()=>musicCall('next'),mplay:()=>musicCall('playPause')};
+
 /* ---------- watch sync: Health Connect (Android) ---------- */
 // Reads steps, workouts and weight that Samsung Health, Fitbit / Google Health, Pixel Watch, Garmin etc. share with Health Connect.
 const APP_ID='ca.tallyfit.app';
@@ -1350,7 +1375,7 @@ const ACT={
   delcustom:el=>{const doc=get('custom')||{foods:[]};doc.foods=doc.foods.filter(f=>f.id!==el.dataset.id);put('custom',doc);toast('Food deleted')},
   export:async()=>{const txt=JSON.stringify(S.docs,null,1);try{await navigator.clipboard.writeText(txt);toast('Copied your data to the clipboard')}catch(e){toast('Copy was blocked by the browser')}}
 };
-Object.assign(ACT,WACT,SACT,AACT,HACT);
+Object.assign(ACT,WACT,SACT,AACT,HACT,MACT);
 document.addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');
   if(!el){if(e.target.id==='modal')closeModal();return}

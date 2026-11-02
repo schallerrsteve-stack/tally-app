@@ -226,3 +226,11 @@ html{-webkit-text-size-adjust:100%}
 
 .chkrow{display:flex;gap:10px;align-items:flex-start;padding:6px 0;font-size:14px;cursor:pointer}
 .chkrow input{margin-top:3px;flex:none}
+
+.musicbar{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 14px 6px 16px;margin:0 0 16px;max-width:760px;box-shadow:var(--shadow)}
+.musicbar .ml{font-weight:500;color:var(--ink2);font-size:14px;margin-right:auto}
+.musicbar .ms{min-width:52px;text-align:right}
+.mb{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink);display:grid;place-items:center;cursor:pointer;padding:0}
+.mb.big{width:50px;height:50px;background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.mb:active{transform:scale(.94)}
+.intv+.musicbar,.musicbar+.intv{margin-left:auto;margin-right:auto}
