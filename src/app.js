@@ -195,7 +195,7 @@ function vTrends(){
   </div>
   <section class="card chart" style="margin-top:18px"><div class="spread"><h3 style="font-size:18px">Calories per day</h3><div class="legend"><span class="key"><s style="background:var(--bar);height:8px;width:8px;border-radius:2px"></s>Eaten</span><span class="key"><s style="background:var(--ink2);height:0;border-top:2px dashed var(--ink2)"></s>Goal</span></div></div>
   <div id="ch-k" style="margin-top:8px">${calChart(days)}</div></section>
-  <div class="grid" style="margin-top:18px;grid-template-columns:1fr 1fr">
+  <div class="grid grid2" style="margin-top:18px">
   <section class="card chart"><h3 style="font-size:18px">Weight (${wU()})</h3><div id="ch-w" style="margin-top:8px">${ws.length?wChart(days):'<p class="faint">No weigh-ins in this range yet. Log your weight on the Diary page.</p>'}</div></section>
   <section class="card"><h3 style="font-size:18px">Average macro split</h3>
   ${mk?`<div class="seg" role="img" aria-label="Protein ${Math.round(ap*400/mk)}%, carbs ${Math.round(ac*400/mk)}%, fat ${Math.round(af*900/mk)}%"><i style="width:${ap*400/mk}%;background:var(--p)"></i><i style="width:${ac*400/mk}%;background:var(--c)"></i><i style="width:${af*900/mk}%;background:var(--f)"></i></div>
@@ -1217,7 +1217,7 @@ function updateDock(){
   const show=!!(MC()&&S.uid&&dockOn());let d=document.getElementById('musicdock');
   document.body.classList.toggle('hasdock',show);
   if(!show){if(d)d.remove();return}
-  if(!d){d=document.createElement('div');d.id='musicdock';(document.querySelector('header.top')||document.body).appendChild(d)} // pinned under the header, clear of on-screen buttons at the bottom
+  if(!d){d=document.createElement('div');d.id='musicdock';const h=document.querySelector('header.top');if(h)h.insertAdjacentElement('afterend',d);else document.body.prepend(d)} // stays pinned at the top while you scroll
   d.innerHTML=musicBar();
 }
 function refreshMusicBar(){updateDock()}

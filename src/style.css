@@ -249,3 +249,32 @@ a{color:var(--accent)}
 .holdx circle{fill:none;stroke:var(--accent);stroke-width:3;stroke-dasharray:94.25;stroke-dashoffset:94.25;opacity:0}
 .holdx.holding circle{opacity:1;stroke-dashoffset:0;transition:stroke-dashoffset 3s linear}
 .holdx span{position:relative}
+
+/* Fit narrow phones and large Android text sizes */
+.grid{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.stack,.card,.tile,.meal-h,.spread>*{min-width:0}
+.card{overflow-wrap:anywhere}
+.spread{flex-wrap:wrap}
+.datebar{min-width:0}
+.seg-ctl{max-width:100%;overflow-x:auto;scrollbar-width:none}.seg-ctl::-webkit-scrollbar{display:none}
+.seg-ctl button{white-space:nowrap;flex:none}
+.tiles{grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr))}
+.eq{grid-template-columns:repeat(4,minmax(0,auto))}
+@media (max-width:420px){.eq{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 18px}.mrow{grid-template-columns:64px minmax(0,1fr) auto}.ring{width:132px;height:132px}.ring svg{width:132px;height:132px}}
+.chart svg{max-width:100%}
+.grid2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+@media (max-width:860px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.ptable{grid-template-columns:repeat(auto-fill,minmax(min(130px,100%),1fr))}
+.ptable div{gap:8px;min-width:0}
+
+/* Phones: menu shows every item (wraps to two rows); header scrolls away, music bar stays pinned at the top */
+#musicdock{position:sticky;top:0;z-index:6;background:color-mix(in srgb,var(--bg) 94%,transparent);backdrop-filter:blur(8px);padding:8px 12px;border-bottom:1px solid var(--line)}
+@media (max-width:700px){
+  .top{position:static}
+  .top-in{padding:10px 12px 8px;gap:6px}
+  .brand{font-size:20px}
+  nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;width:100%;overflow:visible;margin:0}
+  nav a{text-align:center;padding:7px 4px;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .datebar input[type=date]{flex:1;min-width:0}
+}
