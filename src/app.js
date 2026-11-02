@@ -113,6 +113,7 @@ function vDiary(){
   const pct=budget?Math.min(1,tot.kcal/budget):0,R=62,C=2*Math.PI*R;
   const isToday=S.date===today();
   const prev=day(addDays(S.date,-1));
+  const prevLbl=isToday?'yesterday':esc(nice(addDays(S.date,-1),{weekday:'long'}));
   const SUM=cls=>`<section class="card ${cls}"><div class="summary">
     <div class="ring" role="img" aria-label="${rem>=0?rem+' calories remaining':(-rem)+' calories over'}">
       <svg width="148" height="148" viewBox="0 0 148 148"><circle cx="74" cy="74" r="${R}" fill="none" stroke="var(--soft)" stroke-width="12"/>
@@ -142,7 +143,8 @@ function vDiary(){
       const amt=e.unit?`${+e.qty} × ${esc(e.unit)}${e.unit!=='g'&&e.g?` · ${Math.round(e.g)} g`:''}`:(e.amount?esc(e.amount):'Quick add');
       h+=`<div class="entry"><button class="main" data-act="edit" data-id="${e.id}"><span class="t"><div class="nm">${esc(e.name)}</div><div class="sub">${amt} · P ${fmt(e.n.p,'p')} · C ${fmt(e.n.c,'c')} · F ${fmt(e.n.f,'f')}</div></span><span class="kc">${Math.round(e.n.kcal)}</span></button><button class="x" data-act="delfood" data-id="${e.id}" aria-label="Remove ${esc(e.name)}">×</button></div>`}
       h+=`</div>`}
-    h+=`<div class="addrow"><button class="btn ghost sm" data-act="add" data-meal="${mk}">+ Add food</button></div></section>`;
+    const pl=prev.foods.filter(e=>e.meal===mk&&!list.some(x=>x.name===e.name));
+    h+=`<div class="addrow row"><button class="btn ghost sm" data-act="add" data-meal="${mk}">+ Add food</button>${pl.length?`<button class="btn ghost sm" data-act="copymeal" data-meal="${mk}" title="${esc(pl.map(e=>e.name).join(', '))}">↻ Copy ${prevLbl}’s ${ml.toLowerCase()} (${pl.length})</button>`:''}</div></section>`;
   }
   // exercise
   h+=`<section class="card meal"><div class="meal-h"><h3>Exercise</h3><span class="k">${ex?ex.toLocaleString()+' kcal burned':''}</span></div>`;
@@ -1410,6 +1412,7 @@ const ACT={
   addex:()=>openModal({kind:'ex'}),
   saveex:saveEx,
   water:el=>{const d=day(S.date),n=+el.dataset.n;d.water=d.water===n?n-1:n;put(dk(S.date),d)},
+  copymeal:el=>{const mk=el.dataset.meal,d=day(S.date),p=day(addDays(S.date,-1)).foods.filter(e=>e.meal===mk&&!d.foods.some(x=>x.meal===mk&&x.name===e.name));if(!p.length)return;d.foods=d.foods.concat(p.map(e=>Object.assign({},e,{id:newId()})));put(dk(S.date),d);toast(`Copied ${p.length} food${p.length>1?'s':''} to ${mealName(mk)}`)},
   copyprev:()=>{const p=day(addDays(S.date,-1)),d=day(S.date);d.foods=d.foods.concat(p.foods.map(e=>Object.assign({},e,{id:newId()})));put(dk(S.date),d);toast('Copied from the previous day')},
   range:el=>{S.range=+el.dataset.n;render()},
   saveprofile:saveProfile,
