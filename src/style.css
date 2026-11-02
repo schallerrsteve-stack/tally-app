@@ -238,3 +238,14 @@ html{-webkit-text-size-adjust:100%}
 .sech{font-family:"DM Sans",sans-serif;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink3);font-weight:700;margin:6px 0 -6px}
 .sech:first-of-type{margin:0 0 10px}
 a{color:var(--accent)}
+
+#musicdock{display:flex;justify-content:center;padding:0 12px 8px}
+#musicdock .musicbar{margin:0;width:100%;max-width:520px;padding:3px 6px 3px 16px;box-shadow:none;background:var(--card)}
+#musicdock .mb{width:36px;height:36px}#musicdock .mb.big{width:42px;height:42px}
+@media (max-width:380px){#musicdock .ms{display:none}}
+
+.holdx{position:relative;width:34px;height:34px;display:grid;place-items:center;touch-action:none;-webkit-user-select:none;user-select:none}
+.holdx svg{position:absolute;inset:0;width:34px;height:34px;transform:rotate(-90deg)}
+.holdx circle{fill:none;stroke:var(--accent);stroke-width:3;stroke-dasharray:94.25;stroke-dashoffset:94.25;opacity:0}
+.holdx.holding circle{opacity:1;stroke-dashoffset:0;transition:stroke-dashoffset 3s linear}
+.holdx span{position:relative}

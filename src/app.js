@@ -104,6 +104,7 @@ function render(){
   $('#view').innerHTML=fn();
   if(v==='trends')bindCharts();
   if(S.ws)ensureTick();
+  updateDock();
 }
 function bar(v,t,color){const pct=t?Math.min(100,v/t*100):0;return `<div class="track"><i style="width:${pct}%;background:${color}"></i></div>`}
 function vDiary(){
@@ -300,7 +301,7 @@ function vProfile(){
     </div>
     <p class="faint" style="margin-top:12px">Nutrient targets (fiber, potassium, calcium, iron, vitamin C) follow the US/Canadian Dietary Reference Intakes for your age and sex; sodium uses the 2,300 mg upper limit. These are general guidelines, not medical advice.</p>
   </section>
-  <h3 class="sech">Watch &amp; apps</h3>${hcCard()}<h3 class="sech">Account</h3><section class="card"><h3 style="font-size:18px">Your account</h3><p class="muted" style="font-size:14px">Signed in as <b>${esc(S.email||'')}</b>. Your diary is private to you and syncs across your devices.</p>
+  <h3 class="sech">Watch &amp; apps</h3>${hcCard()}${MC()?`<section class="card"><h3 style="font-size:18px">Music controls</h3><label class="chkrow"><input type="checkbox" id="mdock" ${dockOn()?'checked':''}> Show play/pause and skip buttons at the bottom of every screen (works with YouTube Music, Spotify and other music apps)</label></section>`:''}<h3 class="sech">Account</h3><section class="card"><h3 style="font-size:18px">Your account</h3><p class="muted" style="font-size:14px">Signed in as <b>${esc(S.email||'')}</b>. Your diary is private to you and syncs across your devices.</p>
   <div class="row"><button class="btn sm" data-act="export">Copy all data as JSON</button><button class="btn sm" data-act="importopen">Import from Tally web</button><button class="btn sm ghost" data-act="signout">Sign out</button></div><details style="margin-top:12px"><summary>Delete my account</summary><p class="faint">Permanently deletes your account, diary, workouts, messages and achievements. This can’t be undone.</p><button class="btn sm" data-act="delacct" style="color:var(--warn)">Delete everything</button></details></section><h3 class="sech">About</h3>${aboutCard()}</div></div>`;
 }
 function saveProfile(){
@@ -726,7 +727,6 @@ function vWorkouts(){
   const tab=S.wtab||'start';
   let h=`<div class="datebar"><h2>Workouts</h2><div class="seg-ctl" role="group">${[['start','Start'],['history','History'],['progress','Progress']].map(([k,l])=>`<button class="${tab===k?'on':''}" data-act="wtab" data-t="${k}">${l}</button>`).join('')}</div></div>`;
   if(tab==='start'){
-    if(MC()){h+=musicBar();if(Date.now()-S.music.polled>3000){S.music.polled=Date.now();setTimeout(()=>musicCall('state'),0)}}
     h+=`<div class="grid"><div class="stack"><section class="card"><div class="spread"><h3 style="font-size:18px">Your routines</h3><span class="row"><button class="btn sm" data-act="newint">+ Interval timer</button><button class="btn sm primary" data-act="newroutine">+ New routine</button></span></div>`;
     if(!rts.length)h+=`<p class="faint" style="margin:12px 0 0">No routines yet. Build one — like “Push day” or “5k easy run” — and start it with one tap. Or start an empty workout and add exercises as you go.</p>`;
     h+=`<div class="rlist">${rts.map(r=>{const sub=r.kind==='int'?`${r.int.rounds} rounds · ${r.int.work}s work / ${r.int.rest}s rest`:r.items.map(t=>exById(t.ex).name).slice(0,4).join(', ')+(r.items.length>4?` +${r.items.length-4} more`:'');
@@ -792,7 +792,7 @@ function exChart(id){
 /* ---------- live session ---------- */
 function vSession(){
   const w=S.ws,el=Math.round((Date.now()-w.start)/1000);
-  let h=`<div class="datebar"><h2><input id="ws-name" class="titleinp" value="${esc(w.name)}" aria-label="Workout name"></h2><span class="faint" id="ws-clock">${mmss(el)}</span><button class="btn ghost" data-act="wsdiscard">Discard</button><button class="btn primary" data-act="wsfinish">Finish</button></div>${musicBar()}<div class="stack" style="max-width:760px">`;
+  let h=`<div class="datebar"><h2><input id="ws-name" class="titleinp" value="${esc(w.name)}" aria-label="Workout name"></h2><span class="faint" id="ws-clock">${mmss(el)}</span><button class="btn ghost" data-act="wsdiscard">Discard</button><button class="btn primary" data-act="wsfinish">Finish</button></div><div class="stack" style="max-width:760px">`;
   w.items.forEach((it,ii)=>{const ex=exById(it.ex);const prev=lastSets(it.ex);
     const cols=ex.kind==='w'?[wU(),'Reps']:ex.kind==='bw'?['Reps','+'+wU()]:ex.kind==='t'?['Seconds']:['Minutes',distU()];
     h+=`<section class="card ses"><div class="spread"><h3 style="font-size:18px">${esc(ex.name)}</h3><span class="row"><span class="faint resttxt">${ex.kind==='c'?'':`Rest ${mmss(it.rest)}`}</span><button class="btn ghost sm" data-act="wsmove" data-i="${ii}" data-d="-1" aria-label="Move up">↑</button><button class="btn ghost sm" data-act="wsmove" data-i="${ii}" data-d="1" aria-label="Move down">↓</button><button class="x" data-act="wsrmex" data-i="${ii}" aria-label="Remove ${esc(ex.name)}">×</button></span></div>
@@ -867,7 +867,7 @@ function curPhaseElapsed(){const w=S.ws;return w.elapsedPhase+(w.paused||!w.phas
 function vInterval(){
   const w=S.ws,p=intPlan(w.int),ph=p[w.step];
   const left=ph?ph[1]-curPhaseElapsed():0;const total=p.reduce((a,x)=>a+x[1],0);
-  return `<div class="datebar"><h2>${esc(w.name)}</h2><button class="btn ghost" data-act="wsdiscard">Discard</button><button class="btn primary" data-act="wsfinish">Finish</button></div>${musicBar()}
+  return `<div class="datebar"><h2>${esc(w.name)}</h2><button class="btn ghost" data-act="wsdiscard">Discard</button><button class="btn primary" data-act="wsfinish">Finish</button></div>
   <section class="card intv ${ph?ph[0].toLowerCase().replace(/[^a-z]/g,''):''}"><div class="phase" id="int-phase">${ph?esc(ph[0])+(ph[2]?` · round ${ph[2]} of ${w.int.rounds}`:''):'Done!'}</div>
   <div class="big" id="int-left">${mmss(left)}</div>
   <div class="track" style="height:10px;margin:14px 0"><i id="int-prog" style="width:${Math.min(100,intDoneSeconds()/total*100)}%;background:var(--accent)"></i></div>
@@ -1209,14 +1209,34 @@ function musicBar(){
   <button class="mb" data-act="mprev" aria-label="Previous song">${ICO.prev}</button>
   <button class="mb big" data-act="mplay" aria-label="${p?'Pause music':'Play music'}">${p?ICO.pause:ICO.play}</button>
   <button class="mb" data-act="mnext" aria-label="Next song">${ICO.next}</button>
-  <span class="faint ms">${p===true?'Playing':p===false?'Paused':''}</span></div>`;
+  <span class="faint ms">${p===true?'Playing':p===false?'Paused':''}</span><button class="x holdx" data-act="mhide" aria-label="Hold for 3 seconds to hide music controls"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15"/></svg><span>×</span></button></div>`;
 }
-function refreshMusicBar(){const el=document.querySelector('.musicbar');if(el){const t=document.createElement('div');t.innerHTML=musicBar();if(t.firstElementChild)el.replaceWith(t.firstElementChild)}}
+const dockOn=()=>{try{return localStorage.getItem('tally.musicdock')!=='0'}catch(e){return true}};
+function updateDock(){
+  if(holdT)return; // don't redraw mid-hold
+  const show=!!(MC()&&S.uid&&dockOn());let d=document.getElementById('musicdock');
+  document.body.classList.toggle('hasdock',show);
+  if(!show){if(d)d.remove();return}
+  if(!d){d=document.createElement('div');d.id='musicdock';(document.querySelector('header.top')||document.body).appendChild(d)} // pinned under the header, clear of on-screen buttons at the bottom
+  d.innerHTML=musicBar();
+}
+function refreshMusicBar(){updateDock()}
 async function musicCall(fn,args){const m=MC();if(!m)return;try{const r=await m[fn](args||{});if(r&&typeof r.playing==='boolean')S.music.playing=r.playing}catch(e){if(fn!=='state')toast('Music controls aren’t available right now')}refreshMusicBar()}
-function musicPoll(){if(!MC()||(!S.ws&&S.view!=='workouts'))return;if(Date.now()-S.music.polled<5000)return;S.music.polled=Date.now();musicCall('state')}
+function musicPoll(){if(!MC()||!dockOn()||document.hidden)return;if(Date.now()-S.music.polled<5000)return;S.music.polled=Date.now();musicCall('state')}
 let duckUntil=0;
 function duck(ms){const m=MC();if(!m||Date.now()<duckUntil)return;duckUntil=Date.now()+ms-200;m.duck({ms}).catch(()=>{})}
-const MACT={mprev:()=>musicCall('previous'),mnext:()=>musicCall('next'),mplay:()=>musicCall('playPause')};
+// The × must be held for 3 seconds, so the bar can't be hidden by accident
+let holdT=null,holdDone=false;
+function hideDock(){try{localStorage.setItem('tally.musicdock','0')}catch(e){}holdT=null;updateDock();toast('Music controls hidden — turn them back on in Settings')}
+function holdEnd(el,cancelled){if(!holdT)return;clearTimeout(holdT);holdT=null;if(el)el.classList.remove('holding');if(cancelled&&!holdDone)toast('Hold × for 3 seconds to hide the music controls')}
+document.addEventListener('pointerdown',e=>{const el=e.target.closest&&e.target.closest('.holdx');if(!el)return;e.preventDefault();holdDone=false;el.classList.add('holding');
+  holdT=setTimeout(()=>{holdDone=true;el.classList.remove('holding');try{navigator.vibrate&&navigator.vibrate(30)}catch(x){}hideDock()},3000)});
+['pointerup','pointercancel','pointerleave'].forEach(t=>document.addEventListener(t,e=>{const el=e.target.closest&&e.target.closest('.holdx');if(el||t!=='pointerleave')holdEnd(document.querySelector('.holdx.holding'),true)},true));
+document.addEventListener('contextmenu',e=>{if(e.target.closest&&e.target.closest('.holdx'))e.preventDefault()});
+const MACT={mprev:()=>musicCall('previous'),mnext:()=>musicCall('next'),mplay:()=>musicCall('playPause'),
+  mhide:()=>{} // handled by the 3-second hold above
+};
+setInterval(()=>{if(S.uid)musicPoll()},5000);
 
 /* ---------- watch sync: Health Connect (Android) ---------- */
 // Reads steps, workouts and weight that Samsung Health, Fitbit / Google Health, Pixel Watch, Garmin etc. share with Health Connect.
@@ -1435,6 +1455,7 @@ document.addEventListener('change',e=>{
   else if(id==='x-act')exCalc();
   else if(e.target.classList.contains('restsel')&&S.ws){S.ws.items[+e.target.dataset.i].rest=+e.target.value;saveWs()}
   else if(id==='wex'){S.wex=e.target.value;e.target.blur();render()}
+  else if(id==='mdock'){try{localStorage.setItem('tally.musicdock',e.target.checked?'1':'0')}catch(err){}updateDock()}
   else if(e.target.classList.contains('hctog')){const p=hcPrefs();p[e.target.dataset.k]=e.target.checked;setHcPrefs(p);if(e.target.checked)hcSync(true,true)}
   else if(e.target.classList.contains('sharetog')){const s=get('sharing')||{};s[e.target.dataset.k]=e.target.checked;put('sharing',s);toast('Sharing updated')}
   else if(id==='dpick'&&e.target.value){S.date=e.target.value;render()}
