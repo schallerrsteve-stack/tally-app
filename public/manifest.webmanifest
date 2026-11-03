@@ -1,6 +1,7 @@
 {
   "name": "Tally — Nutrition & Fitness",
   "short_name": "Tally",
+  "description": "Tally — get locked in. Nutrition, workouts and friends.",
   "start_url": "./#diary",
   "scope": "./",
   "display": "standalone",

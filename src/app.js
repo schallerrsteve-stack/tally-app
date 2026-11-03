@@ -1264,7 +1264,7 @@ async function checkUpdate(manual){
 }
 function aboutCard(){
   const u=S.upd;
-  return `<section class="card"><h3 style="font-size:18px">About Tally</h3>
+  return `<section class="card"><h3 style="font-size:18px">About Tally</h3><p class="tagline" style="margin:-4px 0 10px">get locked in</p>
   <div class="ptable" style="grid-template-columns:1fr">
     <div><span>Version</span><span>${esc(verLabel())}</span></div>
     <div><span>Built</span><span>${esc(new Date(VER.date).toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'}))} · ${esc(VER.commit)}</span></div>
@@ -1415,7 +1415,8 @@ const HACT={
 let AU={step:'email',email:'',busy:false,err:''};
 function vAuth(){
   return `<div class="authbox card"><div class="brand" style="justify-content:center;font-size:30px"><i></i>Tally</div>
-  <p class="muted" style="text-align:center;margin:6px 0 18px">Nutrition, workouts and friends.</p>
+  <p class="tagline" style="text-align:center;margin:4px 0 2px">get locked in</p>
+  <p class="muted" style="text-align:center;margin:0 0 18px">Nutrition, workouts and friends.</p>
   ${AU.step==='email'?`<label class="field">Email<input id="au-email" class="inp" type="email" autocomplete="email" value="${esc(AU.email)}" placeholder="you@example.com" autofocus></label>
   <button class="btn primary" data-act="ausend" style="width:100%;margin-top:12px" ${AU.busy?'disabled':''}>${AU.busy?'<span class="spin"></span> Sending…':'Email me a sign-in code'}</button>
   <p class="faint" style="margin-top:10px">New here? The same code creates your account. If a friend invited you, use the address the invite went to.</p>`
