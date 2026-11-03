@@ -101,7 +101,7 @@ function render(){
   if((v==='profile'||v==='workouts'||v==='social')&&ae&&ae.closest&&ae.closest('#view')&&/INPUT|SELECT/.test(ae.tagName)&&!S._force)return; // don't clobber typing
   if(!S.uid){$('#view').innerHTML=vAuth();document.body.classList.add('signedout');return}document.body.classList.remove('signedout');
   const fn={diary:vDiary,workouts:vWorkouts,social:vSocial,trends:vTrends,foods:vFoods,profile:vProfile}[v]||vDiary;
-  $('#view').innerHTML=fn();
+  $('#view').innerHTML=tgBanner()+fn();
   if(v==='trends')bindCharts();
   if(S.ws)ensureTick();
   updateDock();
@@ -326,7 +326,7 @@ function openModal(st){M=st;S.fabOpen=false;updateFab();$('#modal').hidden=false
 function closeModal(){M=null;$('#modal').hidden=true;$('#modal').innerHTML='';updateFab();document.body.style.overflow=''}
 function drawModal(focus){
   if(!M)return;
-  $('#modal').innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="${M.kind==='ex'?'Add exercise':M.kind==='routine'?'Routine':M.kind==='pick'?'Pick exercise':M.kind==='summary'?'Workout summary':'Add food'}">${M.kind==='ex'?exBody():M.kind==='weight'?weightBody():M.kind==='round'?roundBody():M.kind==='routine'?routineBody():M.kind==='pick'?pickerBody():M.kind==='summary'?summaryBody():M.kind==='newchat'?newChatBody():M.kind==='newchal'?newChalBody():M.kind==='import'?importBody():foodBody()}</div>`;
+  $('#modal').innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="${M.kind==='ex'?'Add exercise':M.kind==='routine'?'Routine':M.kind==='pick'?'Pick exercise':M.kind==='summary'?'Workout summary':'Add food'}">${M.kind==='ex'?exBody():M.kind==='weight'?weightBody():M.kind==='round'?roundBody():M.kind==='routine'?routineBody():M.kind==='pick'?pickerBody():M.kind==='summary'?summaryBody():M.kind==='newchat'?newChatBody():M.kind==='together'?togetherBody():M.kind==='newchal'?newChalBody():M.kind==='import'?importBody():foodBody()}</div>`;
   const f=$('#modal [autofocus]');if(f&&focus!==false)f.focus();
 }
 const mealName=k=>(MEALS.find(m=>m[0]===k)||MEALS[3])[1];
@@ -701,7 +701,7 @@ function exHistory(exId,before){
 function lastSets(exId){const h=exHistory(exId);return h.length?h[0].it.sets.filter(s=>s.done):null}
 /* draft persistence for an in-progress session */
 const WSK='tally.ws';
-function saveWs(){try{S.ws?localStorage.setItem(WSK,JSON.stringify(S.ws)):localStorage.removeItem(WSK)}catch(e){}}
+function saveWs(){try{S.ws?localStorage.setItem(WSK,JSON.stringify(S.ws)):localStorage.removeItem(WSK)}catch(e){}if(S.ws&&S.ws.session&&S.ws.kind!=='int')tgProgress()}
 try{const x=JSON.parse(localStorage.getItem(WSK)||'null');if(x&&x.start)S.ws=x}catch(e){}
 function newSet(ex,tmpl){
   if(ex.kind==='c')return {t:tmpl&&tmpl.min?tmpl.min*60:'',d:tmpl&&tmpl.dist?tmpl.dist:'',done:false};
@@ -733,7 +733,7 @@ function vWorkouts(){
     h+=`<div class="grid"><div class="stack"><section class="card"><div class="spread"><h3 style="font-size:18px">Your routines</h3><span class="row"><button class="btn sm" data-act="newround">⏱ Round clock</button><button class="btn sm" data-act="newint">+ Interval timer</button><button class="btn sm primary" data-act="newroutine">+ New routine</button></span></div>`;
     if(!rts.length)h+=`<p class="faint" style="margin:12px 0 0">No routines yet. Build one — like “Push day” or “5k easy run” — and start it with one tap. Or start an empty workout and add exercises as you go.</p>`;
     h+=`<div class="rlist">${rts.map(r=>{const sub=r.kind==='int'?(r.int.style==='round'?`${r.int.rounds} rounds · ${mmss(r.int.work)} / ${mmss(r.int.rest)} rest`:`${r.int.rounds} rounds · ${r.int.work}s work / ${r.int.rest}s rest`):r.items.map(t=>exById(t.ex).name).slice(0,4).join(', ')+(r.items.length>4?` +${r.items.length-4} more`:'');
-      return `<div class="rrow"><div class="t"><div class="nm">${esc(r.name)}${r.kind==='int'?(r.int.style==='round'?' <span class="tag">Round clock</span>':' <span class="tag">Intervals</span>'):''}</div><div class="sub">${esc(sub)||'Empty'}</div></div><button class="btn ghost sm" data-act="editroutine" data-id="${r.id}">Edit</button><button class="btn sm primary" data-act="startroutine" data-id="${r.id}">Start</button></div>`}).join('')}</div>
+      return `<div class="rrow"><div class="t"><div class="nm">${esc(r.name)}${r.kind==='int'?(r.int.style==='round'?' <span class="tag">Round clock</span>':' <span class="tag">Intervals</span>'):''}</div><div class="sub">${esc(sub)||'Empty'}</div></div><button class="btn ghost sm" data-act="rtshare" data-id="${r.id}" aria-label="Share or work out together" title="Share or work out together">👥</button><button class="btn ghost sm" data-act="editroutine" data-id="${r.id}">Edit</button><button class="btn sm primary" data-act="startroutine" data-id="${r.id}">Start</button></div>`}).join('')}</div>
       <div style="margin-top:14px"><button class="btn" data-act="startempty">Start an empty workout</button></div></section></div>`;
     // this week summary
     const wkStart=addDays(today(),-((new Date(today()+'T12:00').getDay()+6)%7));
@@ -795,10 +795,10 @@ function exChart(id){
 /* ---------- live session ---------- */
 function vSession(){
   const w=S.ws,el=Math.round((Date.now()-w.start)/1000);
-  let h=`<div class="datebar"><h2><input id="ws-name" class="titleinp" value="${esc(w.name)}" aria-label="Workout name"></h2><span class="faint" id="ws-clock">${mmss(el)}</span><button class="btn ghost" data-act="wsdiscard">Discard</button><button class="btn primary" data-act="wsfinish">Finish</button></div><div class="stack" style="max-width:760px">`;
+  let h=`<div class="datebar"><h2><input id="ws-name" class="titleinp" value="${esc(w.name)}" aria-label="Workout name"></h2><span class="faint" id="ws-clock">${mmss(el)}</span><button class="btn ghost" data-act="wsdiscard">Discard</button><button class="btn primary" data-act="wsfinish">Finish</button></div><div class="stack" style="max-width:760px">${tgIn()?`<div id="tg-strip">${tgStrip()}</div>`:''}`;
   w.items.forEach((it,ii)=>{const ex=exById(it.ex);const prev=lastSets(it.ex);
     const cols=ex.kind==='w'?[wU(),'Reps']:ex.kind==='bw'?['Reps','+'+wU()]:ex.kind==='t'?['Seconds']:['Minutes',distU()];
-    h+=`<section class="card ses"><div class="spread"><h3 style="font-size:18px">${esc(ex.name)}</h3><span class="row"><span class="faint resttxt">${ex.kind==='c'?'':`Rest ${mmss(it.rest)}`}</span><button class="btn ghost sm" data-act="wsmove" data-i="${ii}" data-d="-1" aria-label="Move up">↑</button><button class="btn ghost sm" data-act="wsmove" data-i="${ii}" data-d="1" aria-label="Move down">↓</button><button class="x" data-act="wsrmex" data-i="${ii}" aria-label="Remove ${esc(ex.name)}">×</button></span></div>
+    h+=`<section class="card ses"><div class="spread"><h3 style="font-size:18px">${esc(ex.name)}</h3><span class="row"><span class="faint resttxt">${ex.kind==='c'?'':`Rest ${mmss(it.rest)}`}</span><button class="btn ghost sm" data-act="wsmove" data-i="${ii}" data-d="-1" aria-label="Move up">↑</button><button class="btn ghost sm" data-act="wsmove" data-i="${ii}" data-d="1" aria-label="Move down">↓</button><button class="x" data-act="wsrmex" data-i="${ii}" aria-label="Remove ${esc(ex.name)}">×</button></span></div>${tgIn()?`<div class="tgpart" data-ex="${esc(it.ex)}">${tgPartnerSets(it.ex)}</div>`:''}
     <div class="sets" style="--nc:${cols.length}"><div class="sh"><span>Set</span><span>Previous</span>${cols.map(c=>`<span>${esc(c)}</span>`).join('')}<span>✓</span></div>`;
     it.sets.forEach((st,si)=>{const ps=prev&&prev[si];
       const f=(k,val,ph)=>`<input class="inp si" inputmode="decimal" data-i="${ii}" data-s="${si}" data-k="${k}" value="${val}" placeholder="${ph||''}">`;
@@ -850,6 +850,7 @@ function finishWorkout(){
   }
   const k=wkKey(rec.date),doc=get(k)||{list:[]};doc.list=(doc.list||[]).concat([rec]);
   const d=day(rec.date);d.ex.push({id:newId(),name:rec.name,min:Math.round(rec.durMin),kcal:rec.kcal,wid:rec.id});
+  if(w.session){clearTimeout(tgPubT);tgEnd('done',w.session,tgPayload(w));rec.together=true}
   S.ws=null;S.rest=null;saveWs();
   put(k,doc);put(dk(rec.date),d);
   S.wtab='start';render();
@@ -878,14 +879,14 @@ function vInterval(){
   const el=ph?curPhaseElapsed():0,left=ph?ph[1]-el:0,frac=ph?Math.min(1,el/ph[1]):1;
   const next=p[w.step+1];
   return `<div class="datebar"><h2>${esc(w.name)}</h2><button class="btn ghost" data-act="wsdiscard">Discard</button><button class="btn primary" data-act="wsfinish">Finish</button></div>
-  <section class="card intv ${phaseClass(ph,left,I)}" id="intv">
+  ${tgIn()?`<div id="tg-strip" style="margin-bottom:12px">${tgStrip()}</div>`:''}<section class="card intv ${phaseClass(ph,left,I)}" id="intv">
     <div class="clock" role="timer" aria-live="off">
       <svg viewBox="0 0 280 280" aria-hidden="true"><circle class="ctrack" cx="140" cy="140" r="${RING_R}"/><circle class="cprog" id="int-ring" cx="140" cy="140" r="${RING_R}" stroke-dasharray="${RING_C}" stroke-dashoffset="${RING_C*frac}"/></svg>
       <div class="cface"><div class="phase" id="int-phase">${ph?esc(ph[0]):'Done!'}</div><div class="big" id="int-left">${mmss(Math.ceil(left))}</div>
       <div class="rnd" id="int-round">${ph&&ph[2]?`${R?'':'Round '}${ph[2]} <span>of ${I.rounds}</span>`:ph?'':`${I.rounds} ${R?'rounds':'rounds'} done`}</div></div>
     </div>
     <div class="faint" id="int-next">${next?'Next: '+esc(next[0])+(next[2]&&next[0]!=='Rest'?' '+next[2]:'')+' · '+mmss(next[1]):ph?'Last one!':''}</div>
-    <div class="row" style="justify-content:center;margin-top:16px">${ph?`<button class="btn primary" data-act="intpause" style="min-width:130px">${w.paused?(w.phaseStart||w.elapsedPhase?'Resume':'Start'):'Pause'}</button><button class="btn" data-act="intskip">Skip</button>`:'<button class="btn primary" data-act="wsfinish">Save workout</button>'}</div>
+    <div class="row" style="justify-content:center;margin-top:16px">${ph&&tgIn()&&!tgHost()?`<span class="faint">⏱ ${esc(pname(S.ws.session.host))} runs the clock${w.paused&&!w.phaseStart&&!w.elapsedPhase?' — waiting to start':w.paused?' — paused':''}</span>`:ph?`<button class="btn primary" data-act="intpause" style="min-width:130px">${w.paused?(w.phaseStart||w.elapsedPhase?'Resume':'Start'):'Pause'}</button><button class="btn" data-act="intskip">Skip</button>`:'<button class="btn primary" data-act="wsfinish">Save workout</button>'}</div>
   </section>`;
 }
 /* sounds: synthesized boxing bell and wooden "clapper" knock */
@@ -903,7 +904,7 @@ function intTick(){
     if(ph[0]==='Round'&&+I.warn&&left<=+I.warn&&left>+I.warn-1&&w._warned!==w.step){w._warned=w.step;duck(1500);clapper(3)}
     if(ph[0]!=='Round'&&left<=3.05&&left>0&&Math.floor(left)!==w._lastBeep){if(w._lastBeep==null)duck(4500);w._lastBeep=Math.floor(left);beep(660,.12)}
   }else if(left<=3.05&&left>0&&Math.floor(left)!==w._lastBeep){if(w._lastBeep==null)duck(4500);w._lastBeep=Math.floor(left);beep(660,.12)}
-  if(left<=0){w.step++;w.elapsedPhase=0;w.phaseStart=Date.now();w._lastBeep=null;
+  if(left<=0){const endAt=w.phaseStart+(ph[1]-w.elapsedPhase)*1000;w.step++;w.elapsedPhase=0;w.phaseStart=endAt;w._lastBeep=null;tgClock();
     const nx=p[w.step];
     if(R){duck(2500);if(!nx)bell(3,.35);else if(nx[0]==='Round')bell(1);else bell(2,.3)}
     else{duck(1200);beep(nx&&nx[0]==='Work'?1040:520,.35)}
@@ -1005,9 +1006,9 @@ const WACT={
   restadj:el=>{if(S.rest){S.rest.end+=(+el.dataset.n)*1000;const l=$('#rest-left');if(l)l.textContent=mmss((S.rest.end-Date.now())/1000)}},
   restskip:()=>{S.rest=null;render()},
   wsfinish:()=>{if(S.ws.kind!=='int'&&!S.ws.items.some(it=>it.sets.some(s=>s.done))){toast('Tick off at least one set (✓) before finishing');return}finishWorkout()},
-  wsdiscard:()=>{if(!confirmReplace())return;S.ws=null;S.rest=null;saveWs();render();toast('Workout discarded')},
-  intpause:()=>{const w=S.ws;beep(1,.01);if(w.paused){const first=!w.phaseStart&&!w.elapsedPhase;w.paused=false;w.phaseStart=Date.now();keepAwake(true);if(first&&w.int.style==='round'&&!+w.int.warm)bell(1)}else{w.elapsedPhase=curPhaseElapsed();w.paused=true;keepAwake(false)}saveWs();render()},
-  intskip:()=>{const w=S.ws;w.step++;w.elapsedPhase=0;w.phaseStart=Date.now();saveWs();render()},
+  wsdiscard:()=>{if(!confirmReplace())return;if(tgIn())tgEnd('left');S.ws=null;S.rest=null;saveWs();render();toast('Workout discarded')},
+  intpause:()=>{if(tgIn()&&!tgHost())return;const w=S.ws;beep(1,.01);if(w.paused){const first=!w.phaseStart&&!w.elapsedPhase;w.paused=false;w.phaseStart=Date.now();keepAwake(true);if(first&&w.int.style==='round'&&!+w.int.warm)bell(1)}else{w.elapsedPhase=curPhaseElapsed();w.paused=true;keepAwake(false)}saveWs();tgClock();render()},
+  intskip:()=>{if(tgIn()&&!tgHost())return;const w=S.ws;w.step++;w.elapsedPhase=0;w.phaseStart=Date.now();saveWs();tgClock();render()},
   saveasroutine:el=>{const w=allWorkouts().find(x=>x.id===el.dataset.id);if(!w)return;const r=w.int?{id:'r'+newId(),name:w.name,kind:'int',int:Object.assign({},w.int)}:{id:'r'+newId(),name:w.name,kind:'std',items:w.items.map(it=>{const ex=exById(it.ex),s=it.sets[0]||{};return ex.kind==='c'?{ex:it.ex,min:s.t?Math.round(s.t/60):30,dist:s.d||''}:ex.kind==='t'?{ex:it.ex,sets:it.sets.length,secs:s.t,rest:60}:{ex:it.ex,sets:it.sets.length,reps:s.r,wt:s.w,rest:90}})};
     if(M)closeModal();openModal({kind:'routine',isNew:true,r})},
   delworkout:el=>{const k=wkKey(el.dataset.date),doc=get(k);if(!doc)return;doc.list=doc.list.filter(w=>w.id!==el.dataset.id);put(k,doc);
@@ -1091,7 +1092,7 @@ function vChats(){
 function vThread(){
   const c=SOC.thread;
   return `<div class="datebar"><button class="btn ghost" data-act="closeconv">‹ Back</button><h2 style="font-size:22px">${esc(convTitle(c))}</h2></div>
-  <section class="card thread"><div class="msgs" id="msgs">${SOC.msgs.length?SOC.msgs.map(m=>`<div class="msg ${m.sender_id===S.uid?'me':''}">${m.sender_id!==S.uid&&c.is_group?`<div class="who">${esc(pname(m.sender_id))}</div>`:''}<div class="bub">${esc(m.body)}</div><div class="when">${ago(m.created_at)}</div></div>`).join(''):'<p class="faint">Say hi 👋</p>'}</div>
+  <section class="card thread"><div class="msgs" id="msgs">${SOC.msgs.length?SOC.msgs.map(m=>`<div class="msg ${m.sender_id===S.uid?'me':''}">${m.sender_id!==S.uid&&c.is_group?`<div class="who">${esc(pname(m.sender_id))}</div>`:''}${m.routine?routineCard(m):`<div class="bub">${esc(m.body)}</div>`}<div class="when">${ago(m.created_at)}</div></div>`).join(''):'<p class="faint">Say hi 👋</p>'}</div>
   <form class="row sendrow" onsubmit="return false"><input id="msg-in" class="inp" placeholder="Message" autocomplete="off" maxlength="4000" style="flex:1"><button class="btn primary" data-act="sendmsg">Send</button></form></section>`;
 }
 function statLine(st){if(!st||!st.stats)return '';const s=st.stats,out=[];
@@ -1171,7 +1172,7 @@ async function postAchievements(rec){
 let rtChannel=null;
 function socialRealtime(){
   if(rtChannel)sb.removeChannel(rtChannel);
-  rtChannel=sb.channel('social-'+S.uid)
+  rtChannel=tgRealtime(sb.channel('social-'+S.uid)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages'},async p=>{const m=p.new;
       if(SOC.thread&&m.conversation_id===SOC.thread.id){if(!SOC.msgs.some(x=>x.id===m.id))SOC.msgs.push(m);markRead(m.conversation_id);if(S.view==='social')renderThreadMsgs();}
       else{const c=SOC.convs.find(x=>x.id===m.conversation_id);if(c){c.last=m;c.unread=m.sender_id!==S.uid;SOC.convs.sort((a,b)=>new Date(b.last?b.last.created_at:b.created_at)-new Date(a.last?a.last.created_at:a.created_at))}else if(SOC.loaded)await loadConvs();
@@ -1179,7 +1180,7 @@ function socialRealtime(){
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'achievements'},async p=>{if(!SOC.loaded)return;await loadPeople([p.new.user_id]);if(!SOC.feed.some(a=>a.id===p.new.id))SOC.feed.unshift(p.new);SOC.reactions[p.new.id]=[];if(S.view==='social')render()})
     .on('postgres_changes',{event:'*',schema:'public',table:'reactions'},p=>{const r=p.new&&p.new.achievement_id?p.new:p.old;if(!r||!SOC.reactions[r.achievement_id])return;
       if(p.eventType==='INSERT'){if(!SOC.reactions[r.achievement_id].some(x=>x.user_id===r.user_id&&x.emoji===r.emoji))SOC.reactions[r.achievement_id].push(r)}else loadReactions([r.achievement_id]).then(()=>{if(S.view==='social')render()});if(S.view==='social')render()})
-    .subscribe();
+    ).subscribe();
 }
 function updateBadge(){const a=document.querySelector('nav a[data-v="social"]');if(a)a.dataset.badge=unreadCount()||''}
 async function markRead(cid){await sb.from('conversation_members').update({last_read_at:new Date().toISOString()}).eq('conversation_id',cid).eq('user_id',S.uid);const c=SOC.convs.find(x=>x.id===cid);if(c)c.unread=false;updateBadge()}
@@ -1459,7 +1460,7 @@ const AACT={
   auverify:async()=>{const c=($('#au-code').value||'').replace(/\s/g,'');if(c.length<6){AU.err='Enter the code from the email';render();return}
     AU.busy=true;AU.err='';render();try{const u=await verifyCode(AU.email,c);AU={step:'email',email:'',busy:false,err:''};start(u)}catch(err){AU.busy=false;AU.err='That code didn’t work — check it or request a new one.';render()}},
   auback:()=>{AU.step='email';AU.err='';render()},
-  signout:async()=>{if(!confirmReplace())return;if(STORE)STORE.close();if(rtChannel)sb.removeChannel(rtChannel);await signOut();STORE=null;S.uid=null;S.docs={};Object.assign(SOC,{loaded:false,people:{},friends:[],feed:[],convs:[],challenges:[],thread:null});location.hash='#diary';render()},
+  signout:async()=>{if(!confirmReplace())return;if(STORE)STORE.close();if(rtChannel)sb.removeChannel(rtChannel);await signOut();STORE=null;S.uid=null;S.docs={};Object.assign(TG,{invites:[],session:null,members:{}});Object.assign(SOC,{loaded:false,people:{},friends:[],feed:[],convs:[],challenges:[],thread:null});location.hash='#diary';render()},
   delacct:async()=>{if(!confirmReplace())return;const {error}=await sb.rpc('delete_my_account');if(error){toast('Couldn’t delete: '+error.message);return}try{localStorage.removeItem('tally.cache.'+S.uid);localStorage.removeItem('tally.pending.'+S.uid)}catch(e){}if(STORE)STORE.close();await signOut().catch(()=>{});S.uid=null;S.docs={};toast('Your account was deleted');render()},
   importopen:()=>openModal({kind:'import'}),
   importrun:()=>{let d;try{d=JSON.parse($('#imp-json').value)}catch(e){toast('That isn’t valid JSON');return}let n=0;for(const [k,v] of Object.entries(d||{}))if(/^[A-Za-z0-9_.:-]{1,64}$/.test(k)&&v&&typeof v==='object'){put(k,v);n++}closeModal();toast(`Imported ${n} item${n===1?'':'s'}`)},
@@ -1472,7 +1473,7 @@ function importBody(){return `<div class="sheet-h"><h3>Import from Tally web</h3
 function start(user){
   S.uid=user.id;S.email=user.email;
   STORE=createStore({uid:user.id,onChange:(what)=>{S.docs=STORE.docs;syncNote();if(what==='docs'){afterChange();render()}}});
-  S.docs=STORE.docs;socialRealtime();route();loadSocial();
+  S.docs=STORE.docs;socialRealtime();route();loadSocial();loadTogether();
   if(isNative)setTimeout(()=>checkUpdate(false),4000);
   if(hcNative()){setTimeout(()=>hcSync(false),2500);import('@capacitor/app').then(({App})=>App.addListener('resume',()=>hcSync(false))).catch(()=>{})}
 }
@@ -1498,6 +1499,108 @@ async function boot(){
 /* ---------- events ---------- */
 let toastT;
 function toast(t){let el=$('.toast');if(!el){el=document.createElement('div');el.className='toast';el.setAttribute('role','status');document.body.appendChild(el)}el.textContent=t;el.style.bottom=$('#restbar')?'84px':'';clearTimeout(toastT);toastT=setTimeout(()=>el.remove(),2200)}
+/* ---------- share routines + work out together ---------- */
+// A shared routine travels with the definitions of any custom exercises it uses.
+function rtSummary(r){if(!r)return '';if(r.kind==='int'||r.int){const I=r.int;return I.style==='round'?`${I.rounds} rounds · ${mmss(I.work)} / ${mmss(I.rest)} rest`:`${I.rounds} rounds · ${I.work}s work / ${I.rest}s rest`}
+  const defs=r.exDefs||[],n=(r.items||[]).map(t=>{const d=defs.find(x=>x.id===t.ex);return d?d.name:exById(t.ex).name});return n.slice(0,4).join(', ')+(n.length>4?` +${n.length-4} more`:'')}
+function routinePayload(r){const p=clone(r);delete p.id;const lib=new Set(EXLIB.map(e=>e.id)),ids=new Set((p.items||[]).map(t=>t.ex));
+  p.exDefs=exList().filter(e=>ids.has(e.id)&&!lib.has(e.id));return p}
+function addExDefs(defs){if(!defs||!defs.length)return;const have=new Set(exList().map(e=>e.id)),add=defs.filter(d=>d&&d.id&&!have.has(d.id));
+  if(!add.length)return;const doc=get('exercises')||{list:[]};doc.list=(doc.list||[]).concat(add);put('exercises',doc)}
+function saveSharedRoutine(p){const r=clone(p);addExDefs(r.exDefs);delete r.exDefs;r.id='r'+newId();
+  const doc=get('routines')||{list:[]};doc.list=doc.list||[];const names=new Set(doc.list.map(x=>x.name));
+  if(names.has(r.name)){let i=2;while(names.has(`${r.name} (${i})`))i++;r.name=`${r.name} (${i})`}
+  doc.list.push(r);put('routines',doc);return r}
+
+const TG={invites:[],session:null,members:{},busy:false};
+const tgIn=()=>!!(S.ws&&S.ws.session);
+const tgHost=()=>tgIn()&&S.ws.session.host===S.uid;
+async function loadTogether(){if(!S.uid)return;
+  try{const mine=await q(sb.from('session_members').select('session_id,status').eq('user_id',S.uid).eq('status','invited'));
+    if(!mine.length){TG.invites=[];render();return}
+    const since=new Date(Date.now()-4*3600e3).toISOString();
+    const ss=await q(sb.from('sessions').select('*').in('id',mine.map(m=>m.session_id)).eq('status','open').gte('created_at',since).order('created_at',{ascending:false}));
+    await loadPeople(ss.map(s=>s.host_id));TG.invites=ss;render();
+  }catch(e){}
+  if(tgIn())loadSessionState();
+}
+async function loadSessionState(){if(!tgIn())return;const sid=S.ws.session.id;
+  try{const [s]=await q(sb.from('sessions').select('*').eq('id',sid));const ms=await q(sb.from('session_members').select('*').eq('session_id',sid));
+    TG.session=s||null;TG.members={};for(const m of ms)TG.members[m.user_id]=m;await loadPeople(ms.map(m=>m.user_id));
+    if(s&&!tgHost()&&S.ws.kind==='int'&&s.clock&&s.clock.step!=null)applyClock(s.clock,true);
+    tgDom();
+  }catch(e){}
+}
+function tgBanner(){if(!TG.invites.length||S.ws)return '';const s=TG.invites[0],r=s.routine||{};
+  return `<div class="notice tgb"><span>👥 <b>${esc(pname(s.host_id))}</b> wants to work out together: <b>${esc(r.name||'Workout')}</b><span class="faint"> · ${esc(rtSummary(r))}</span></span><span class="row"><button class="btn sm ghost" data-act="tgdecline" data-id="${s.id}">No thanks</button><button class="btn sm primary" data-act="tgjoin" data-id="${s.id}">Join</button></span></div>`}
+function tgStatus(m,host){if(m.status==='invited')return 'invited…';if(m.status==='left')return 'left';if(m.status==='done')return 'finished ✓';
+  const p=m.progress||{};if(!p.items)return host&&S.ws&&S.ws.kind==='int'?'running the clock':'joined';
+  const cur=p.items.find(it=>(it.done||[]).length<(it.n||0))||p.items[p.items.length-1];const n=p.items.reduce((a,it)=>a+(it.done||[]).length,0);
+  return `${cur?esc(exById(cur.ex).name)+' · ':''}${n} set${n===1?'':'s'} done`}
+function tgStrip(){if(!tgIn())return '';const host=S.ws.session.host;
+  const others=Object.values(TG.members).filter(m=>m.user_id!==S.uid);
+  const ended=TG.session&&TG.session.status==='ended'&&host!==S.uid;
+  return `<div class="tgstrip"><b>👥 Together</b>${others.length?others.map(m=>`<span class="tgp1"><span class="av sm">${esc(pemoji(m.user_id))}</span>${esc(pname(m.user_id))}${m.user_id===host?' <span class="tag">host</span>':''} <span class="faint">${tgStatus(m,m.user_id===host)}</span></span>`).join(''):'<span class="faint">Loading…</span>'}${ended?'<span class="faint">The host has finished.</span>':''}</div>`}
+function tgPartnerSets(exId){if(!tgIn())return '';const ex=exById(exId);
+  return Object.values(TG.members).filter(m=>m.user_id!==S.uid&&m.progress&&m.progress.items).map(m=>{const it=m.progress.items.find(x=>x.ex===exId);if(!it||!(it.done||[]).length)return '';
+    return `<div class="tgsets"><span class="av sm">${esc(pemoji(m.user_id))}</span><b>${esc(pname(m.user_id))}</b> ${it.done.map(s=>esc(setText(ex,s))).join(' · ')}</div>`}).join('')}
+function tgDom(){if(S.view!=='workouts'||!tgIn())return;const st=$('#tg-strip');if(st)st.innerHTML=tgStrip();
+  document.querySelectorAll('.tgpart').forEach(el=>{el.innerHTML=tgPartnerSets(el.dataset.ex)})}
+let tgPubT=null;
+function tgPayload(w){return w.kind==='int'?{int:true}:{items:w.items.map(it=>({ex:it.ex,n:it.sets.length,done:it.sets.filter(s=>s.done).map(s=>{const o={};for(const k of ['w','r','t','d'])if(s[k]!==''&&s[k]!=null)o[k]=s[k];return o})}))}}
+function tgProgress(){if(!tgIn())return;clearTimeout(tgPubT);tgPubT=setTimeout(()=>{if(!tgIn())return;const w=S.ws;
+  sb.from('session_members').update({status:'joined',progress:tgPayload(w),updated_at:new Date().toISOString()}).eq('session_id',w.session.id).eq('user_id',S.uid).then(()=>{})},700)}
+function tgClock(){if(!tgHost()||S.ws.kind!=='int')return;const w=S.ws;
+  sb.from('sessions').update({clock:{step:w.step,phaseStart:w.phaseStart,elapsedPhase:w.elapsedPhase,paused:w.paused},updated_at:new Date().toISOString()}).eq('id',w.session.id).then(()=>{})}
+function applyClock(c,quiet){const w=S.ws;if(!w||w.kind!=='int'||!c||c.step==null)return;
+  const wasIdle=w.paused&&!w.phaseStart&&!w.elapsedPhase;
+  w.step=c.step;w.phaseStart=c.phaseStart;w.elapsedPhase=c.elapsedPhase||0;w.paused=!!c.paused;w._lastBeep=null;
+  if(!quiet&&wasIdle&&!w.paused&&w.int.style==='round'&&!+w.int.warm)bell(1);
+  keepAwake(!w.paused);saveWs();if(S.view==='workouts')render()}
+async function tgEnd(status,sess,progress){sess=sess||(S.ws&&S.ws.session);if(!sess)return;const sid=sess.id,host=sess.host===S.uid;
+  await sb.from('session_members').update(Object.assign({status,updated_at:new Date().toISOString()},progress?{progress}:{})).eq('session_id',sid).eq('user_id',S.uid);
+  if(host)await sb.from('sessions').update({status:'ended',updated_at:new Date().toISOString()}).eq('id',sid)}
+function tgRealtime(ch){
+  return ch.on('postgres_changes',{event:'*',schema:'public',table:'session_members'},async p=>{const m=p.new;if(!m||!m.session_id)return;
+      if(m.user_id===S.uid&&m.status==='invited'&&p.eventType==='INSERT'){await loadTogether();const s=TG.invites.find(x=>x.id===m.session_id);if(s)toast(`👥 ${pname(s.host_id)} wants to work out together`);return}
+      if(tgIn()&&m.session_id===S.ws.session.id){const was=TG.members[m.user_id];TG.members[m.user_id]=m;await loadPeople([m.user_id]);
+        if(m.user_id!==S.uid&&(!was||was.status!==m.status)&&m.status==='joined')toast(`👥 ${pname(m.user_id)} joined`);tgDom()}})
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'sessions'},p=>{const s=p.new;if(!tgIn()||s.id!==S.ws.session.id)return;TG.session=s;
+      if(!tgHost()&&S.ws.kind==='int')applyClock(s.clock);
+      if(s.status==='ended'&&!tgHost())toast(`${pname(s.host_id)} finished the session`);tgDom()})}
+function togetherBody(){const r=M.r;const fr=SOC.friends;
+  return `<div class="sheet-h"><h3>${esc(r.name)}</h3><button class="x" data-act="close" aria-label="Close">×</button></div><div class="sheet-b">
+  <p class="faint" style="margin-top:0">${esc(rtSummary(r))}</p>
+  ${!SOC.loaded?'<p><span class="spin"></span> Loading friends…</p>':fr.length?`<h3 class="minih">Pick friends</h3><div class="rlist">${fr.map(id=>`<label class="rrow" style="cursor:pointer"><input type="checkbox" class="pickf" value="${id}"><div class="av">${esc(pemoji(id))}</div><div class="t"><div class="nm">${esc(pname(id))}</div></div></label>`).join('')}</div>
+  <p class="faint" style="font-size:13px">“Send” puts the routine in your chat so they can save it. “Start together” starts it now — everyone logs their own weights and reps and sees each other’s sets as you go${r.kind==='int'?'; you run the clock for everyone':''}.</p>
+  <div class="row" style="justify-content:flex-end"><button class="btn" data-act="sendroutine">Send routine</button><button class="btn primary" data-act="starttogether">Start together</button></div>`
+  :'<p class="faint">Add friends under <b>Friends → People</b> first.</p>'}</div>`}
+function routineCard(m){const r=m.routine,saved=(get('posted')||{})['rt'+m.id];
+  return `<div class="bub rcard"><div class="rc-t">📋 ${esc(r.name||'Routine')}</div><div class="rc-s">${esc(rtSummary(r))}</div>${m.sender_id===S.uid?'':`<button class="btn sm ${saved?'':'primary'}" data-act="saveshared" data-mid="${m.id}" ${saved?'disabled':''}>${saved?'Saved ✓':'Save to my routines'}</button>`}</div>`}
+const TACT={
+  rtshare:el=>{const r=routines().find(x=>x.id===el.dataset.id);if(!r)return;openModal({kind:'together',r});if(!SOC.loaded)loadSocial().then(()=>{if(M&&M.kind==='together')drawModal()})},
+  sendroutine:async el=>{const ids=[...document.querySelectorAll('.pickf:checked')].map(x=>x.value);if(!ids.length){toast('Pick at least one friend');return}
+    el.disabled=true;const p=routinePayload(M.r);let ok=0;
+    for(const id of ids){const {data:cid,error}=await sb.rpc('start_conversation',{member_ids:[id],group_title:null});if(error)continue;
+      const {error:e2}=await sb.from('messages').insert({conversation_id:cid,sender_id:S.uid,body:`📋 Shared a routine: ${M.r.name}`,routine:p});if(!e2)ok++}
+    el.disabled=false;if(!ok){toast('Couldn’t send — has the update been installed in Supabase?');return}closeModal();toast(`Sent to ${ok} friend${ok>1?'s':''}`);if(SOC.loaded)loadConvs()},
+  starttogether:async el=>{const ids=[...document.querySelectorAll('.pickf:checked')].map(x=>x.value);if(!ids.length){toast('Pick at least one friend');return}
+    if(S.ws){toast('Finish or discard the workout in progress first');return}
+    el.disabled=true;const r=M.r,p=routinePayload(r);const {data:sid,error}=await sb.rpc('start_session',{r:p,invitees:ids});el.disabled=false;
+    if(error){toast(error.message);return}closeModal();startWorkout(r);if(!S.ws)return;S.ws.session={id:sid,host:S.uid};saveWs();
+    TG.session=null;TG.members={};render();await loadSessionState();tgClock();tgProgress();toast('Invite sent — start whenever you’re ready')},
+  tgjoin:async el=>{const s=TG.invites.find(x=>x.id===el.dataset.id);if(!s)return;if(S.ws){toast('Finish or discard the workout in progress first');return}
+    const r=clone(s.routine||{});addExDefs(r.exDefs);delete r.exDefs;r.id=null;
+    (r.items||[]).forEach(t=>{delete t.wt});// your own last weights, not the host's
+    startWorkout(r);if(!S.ws)return;
+    S.ws.session={id:s.id,host:s.host_id};saveWs();TG.session=null;TG.members={};render();TG.invites=TG.invites.filter(x=>x.id!==s.id);
+    await sb.from('session_members').update({status:'joined',updated_at:new Date().toISOString()}).eq('session_id',s.id).eq('user_id',S.uid);
+    await loadSessionState();tgProgress();render()},
+  tgdecline:async el=>{const id=el.dataset.id;TG.invites=TG.invites.filter(x=>x.id!==id);render();await sb.from('session_members').update({status:'left'}).eq('session_id',id).eq('user_id',S.uid)},
+  saveshared:el=>{const m=SOC.msgs.find(x=>String(x.id)===el.dataset.mid);if(!m||!m.routine)return;const r=saveSharedRoutine(m.routine);
+    const p=get('posted')||{};p['rt'+m.id]=1;put('posted',p);toast(`Saved “${r.name}” to your routines`);renderThreadMsgs()},
+};
+
 const ACT={
   day:el=>{S.date=addDays(S.date,+el.dataset.n);render()},
   today:()=>{S.date=today();render()},
@@ -1540,7 +1643,7 @@ const ACT={
   delcustom:el=>{const doc=get('custom')||{foods:[]};doc.foods=doc.foods.filter(f=>f.id!==el.dataset.id);put('custom',doc);toast('Food deleted')},
   export:async()=>{const txt=JSON.stringify(S.docs,null,1);try{await navigator.clipboard.writeText(txt);toast('Copied your data to the clipboard')}catch(e){toast('Copy was blocked by the browser')}}
 };
-Object.assign(ACT,WACT,SACT,AACT,HACT,MACT,VACT,FACT);
+Object.assign(ACT,WACT,SACT,AACT,HACT,MACT,VACT,FACT,TACT);
 document.addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');
   if(!el){if(e.target.id==='modal')closeModal();return}

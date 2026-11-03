@@ -66,7 +66,15 @@ npm run android      # builds, syncs and opens Android Studio → press Run
 Run the security tests locally (needs PostgreSQL 15+):
 ```
 createdb tally_test
-psql -d tally_test -f supabase/tests/supabase_shim.sql -f supabase/migrations/20261031000000_init.sql -f supabase/tests/rls_test.sql
+psql -d tally_test -f supabase/tests/supabase_shim.sql -f supabase/migrations/20261031000000_init.sql -f supabase/migrations/20261031010000_delete_account.sql -f supabase/migrations/20261103000000_together.sql -f supabase/tests/rls_test.sql
+# shared routines + workout-together rules (fresh database)
+psql -d tally_test2 -f supabase/tests/supabase_shim.sql -f supabase/migrations/20261031000000_init.sql -f supabase/migrations/20261103000000_together.sql -f supabase/tests/together_test.sql
+```
+
+Two-person test of routine sharing and working out together (fake Supabase, two browsers):
+```
+npm run build && npx vite preview --port 4173 &
+node tests/together.e2e.cjs
 ```
 
 ## Data credits
