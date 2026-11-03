@@ -1333,14 +1333,31 @@ async function hp(){if(window.__tallyHealthMock)return window.__tallyHealthMock;
 const hcOn=()=>{try{return localStorage.getItem('tally.hc.on')==='1'}catch(e){return false}};
 function hcPrefs(){let p={};try{p=JSON.parse(localStorage.getItem('tally.hc.prefs')||'{}')||{}}catch(e){}return Object.assign({steps:true,workouts:true,weight:true},p)}
 function setHcPrefs(p){try{localStorage.setItem('tally.hc.prefs',JSON.stringify(p))}catch(e){}}
+const HC_READ={read:['steps','workouts','calories','weight'],write:[]};
+const withTimeout=(pr,ms)=>Promise.race([pr,new Promise((_,rej)=>setTimeout(()=>rej(Object.assign(new Error('timeout'),{timeout:true})),ms))]);
 async function hcConnect(){
-  const H=await hp();if(!H)return;
-  let a;try{a=await H.isAvailable()}catch(e){a={available:false,reason:String(e.message||e)}}
-  if(!a.available){S.hcMsg='Health Connect isn’t ready on this phone. On Android 13 or older, install “Health Connect” from the Play Store, then try again.';render();return}
-  let st;try{st=await H.requestAuthorization({read:['steps','workouts','calories','weight'],write:[]})}catch(e){S.hcMsg='Couldn’t ask for permission: '+(e.message||e);render();return}
-  if(!st.readAuthorized||!st.readAuthorized.length){S.hcMsg='No permissions were granted. Tap Connect again and allow steps, exercise and weight.';render();return}
-  try{localStorage.setItem('tally.hc.on','1')}catch(e){}
-  S.hcPerm=st.readAuthorized;S.hcMsg='';await hcSync(true);
+  if(S.hcConnecting)return;
+  S.hcConnecting=true;S.hcMsg='';S.hcHelp=false;render();
+  try{
+    let H;try{H=await hp()}catch(e){throw new Error('the Health Connect module didn’t load ('+(e.message||e)+')')}
+    if(!H){S.hcMsg='Watch sync only works in the Tally Android app. This looks like the web version.';return}
+    let a;try{a=await withTimeout(H.isAvailable(),10000)}catch(e){a={available:false,reason:String(e.message||e)}}
+    if(!a.available){S.hcMsg='Health Connect isn’t ready on this phone'+(a.reason&&a.reason!=='timeout'?` (${a.reason})`:'')+'. On Android 13 or older, install or update “Health Connect” from the Play Store, then try again.';S.hcHelp=true;return}
+    // Already allowed (e.g. granted from Health Connect settings)? Skip the permission sheet.
+    let st=null;try{st=await withTimeout(H.checkAuthorization(HC_READ),10000)}catch(e){}
+    if(!st||!st.readAuthorized||!st.readAuthorized.length){
+      S.hcMsg='Opening Health Connect… allow steps, exercise and weight, then come back.';render();
+      try{st=await withTimeout(H.requestAuthorization(HC_READ),90000)}
+      catch(e){
+        if(e.timeout){S.hcMsg='Health Connect didn’t open its permission screen. You can allow Tally there yourself: tap “Open Health Connect”, go to App permissions → Tally, turn on Steps, Exercise and Weight, then tap “Connect watch” again.';S.hcHelp=true;return}
+        throw new Error('couldn’t ask for permission ('+(e.message||e)+')');
+      }
+    }
+    if(!st||!st.readAuthorized||!st.readAuthorized.length){S.hcMsg='No permissions were granted. Tap “Open Health Connect”, go to App permissions → Tally and turn on Steps, Exercise and Weight, then tap “Connect watch” again.';S.hcHelp=true;return}
+    try{localStorage.setItem('tally.hc.on','1')}catch(e){}
+    S.hcPerm=st.readAuthorized;S.hcMsg='';S.hcHelp=false;S.hcConnecting=false;await hcSync(true);
+  }catch(e){S.hcMsg='Connect problem: '+(e.message||e);S.hcHelp=true}
+  finally{S.hcConnecting=false;render()}
 }
 function hcDisconnect(){try{localStorage.removeItem('tally.hc.on')}catch(e){}S.hcMsg='Stopped syncing. To remove Tally’s access completely, open Health Connect settings.';render()}
 let hcBusy=false,hcLastRun=0;
@@ -1397,8 +1414,8 @@ function hcCard(){
   ${on?`${[['steps','Daily steps'],['workouts','Workouts (added to your Exercise, so they count toward your calorie budget)'],['weight','Weight from a smart scale (your own entries always win)']].map(([k,l])=>`<label class="chkrow"><input type="checkbox" class="hctog" data-k="${k}" ${p[k]?'checked':''}> ${l}</label>`).join('')}
   <p class="faint" style="margin:8px 0">${S.hcSyncing?'<span class="spin"></span> Syncing…':last?'Last synced '+esc(last):'Not synced yet'}</p>
   <div class="row"><button class="btn sm primary" data-act="hcsync" ${S.hcSyncing?'disabled':''}>Sync now</button><button class="btn sm" data-act="hcsettings">Health Connect settings</button><button class="btn sm ghost" data-act="hcoff">Stop syncing</button></div>`
-  :`<button class="btn primary" data-act="hcconnect">Connect watch</button>`}
-  ${S.hcMsg?`<div class="notice ${/problem|couldn|isn|No perm/i.test(S.hcMsg)?'warn':''}" style="margin-top:12px">${esc(S.hcMsg)}</div>`:''}
+  :`<div class="row"><button class="btn primary" data-act="hcconnect" ${S.hcConnecting?'disabled':''}>${S.hcConnecting?'<span class="spin"></span> Connecting…':'Connect watch'}</button>${S.hcHelp?'<button class="btn" data-act="hcsettings">Open Health Connect</button>':''}</div>`}
+  ${S.hcMsg?`<div class="notice ${/problem|couldn|isn|didn|No perm|only works/i.test(S.hcMsg)?'warn':''}" style="margin-top:12px">${esc(S.hcMsg)}</div>`:''}
   <details style="margin-top:10px"><summary>Watch data not showing up?</summary><ul class="faint" style="padding-left:18px;margin:8px 0 0">
   <li><b>Samsung:</b> Samsung Health → Settings → Health Connect → allow it to write steps and exercise, and turn on “Sync with Samsung account”.</li>
   <li><b>Fitbit / Pixel Watch:</b> in the Fitbit (Google Health) app → Connections or Settings → Health Connect → turn on syncing.</li>
@@ -1408,7 +1425,7 @@ const HACT={
   hcconnect:()=>hcConnect(),
   hcsync:()=>hcSync(false,true),
   hcoff:()=>hcDisconnect(),
-  hcsettings:async()=>{const H=await hp();if(H)try{await H.openHealthConnectSettings()}catch(e){toast('Couldn’t open Health Connect')}},
+  hcsettings:async()=>{let H=null;try{H=await hp()}catch(e){}if(!H){toast('Health Connect is only in the Android app');return}try{await H.openHealthConnectSettings()}catch(e){toast('Couldn’t open Health Connect: '+(e.message||e))}},
 };
 
 /* ---------- sign-in ---------- */
