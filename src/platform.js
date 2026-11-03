@@ -84,8 +84,8 @@ export function createStore({ uid, onChange }) {
   };
 }
 
-/* ---------------- Claude (via the Claude edge function; deployed in Supabase as `super-handler`) ---------------- */
-const CLAUDE_FN = import.meta.env.VITE_CLAUDE_FUNCTION || 'super-handler';
+/* ---------------- Claude (via the Claude edge function; deployed in Supabase as `claude`) ---------------- */
+const CLAUDE_FN = import.meta.env.VITE_CLAUDE_FUNCTION || 'claude';
 const blobToB64 = (b) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(b); });
 export async function sample(prompt, opts = {}) {
   const images = [];
