@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
   const url = Deno.env.get("SUPABASE_URL")!;
   const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
   const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const redirectTo = Deno.env.get("INVITE_REDIRECT_URL") ?? "ca.tallyfit.app://auth";
+  const redirectTo = Deno.env.get("INVITE_REDIRECT_URL") ?? "https://schallerrsteve-stack.github.io/tally-app/";
 
   const asUser = createClient(url, anon, { global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } } });
   const { data: { user } } = await asUser.auth.getUser();
