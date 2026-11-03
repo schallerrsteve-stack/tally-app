@@ -42,7 +42,7 @@ With the [Supabase CLI](https://supabase.com/docs/guides/cli):
 supabase login
 supabase link --project-ref YOUR-PROJECT-REF
 supabase functions deploy send-invite
-supabase functions deploy claude
+supabase functions deploy claude   # (the live project uses the name `super-handler`, set in src/platform.js)
 supabase secrets set ANTHROPIC_API_KEY=sk-ant-...      # for "Describe it" and label reading
 ```
 Get an Anthropic API key at console.anthropic.com. Claude use is billed per request (fractions of a cent per label); `CLAUDE_DAILY_LIMIT` (default 60/user/day) caps it.

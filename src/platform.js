@@ -84,12 +84,13 @@ export function createStore({ uid, onChange }) {
   };
 }
 
-/* ---------------- Claude (via the `claude` edge function) ---------------- */
+/* ---------------- Claude (via the Claude edge function; deployed in Supabase as `super-handler`) ---------------- */
+const CLAUDE_FN = import.meta.env.VITE_CLAUDE_FUNCTION || 'super-handler';
 const blobToB64 = (b) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(b); });
 export async function sample(prompt, opts = {}) {
   const images = [];
   for (const b of opts.images || []) images.push({ media_type: b.type || 'image/jpeg', data: await blobToB64(b) });
-  const { data, error } = await sb.functions.invoke('claude', { body: { prompt, images } });
+  const { data, error } = await sb.functions.invoke(CLAUDE_FN, { body: { prompt, images } });
   if (error) {
     const st = error.context && error.context.status;
     const e = new Error('Claude request failed'); e.code = st === 429 ? 'rate_limited' : st === 401 ? 'not_granted' : 'failed'; throw e;
