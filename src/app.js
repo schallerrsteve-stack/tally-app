@@ -1329,7 +1329,9 @@ const wName=t=>WNAMES[t]||String(t||'workout').replace(/([A-Z])/g,' $1').toLower
 const srcName=(n,id)=>SRC[id]||SRC[n]||(n&&!/\./.test(n)?n:'your watch');
 let HPL=null;
 const hcNative=()=>isNative||!!window.__tallyHealthMock; // the mock is only used by automated tests
-async function hp(){if(window.__tallyHealthMock)return window.__tallyHealthMock;if(!isNative)return null;if(!HPL)HPL=(await import('@capgo/capacitor-health')).Health;return HPL}
+// Returns {H} rather than the plugin itself: a Capacitor plugin proxy answers every property, including
+// `then`, so returning or awaiting it directly makes the promise wait on a native call that never answers.
+async function hpBox(){if(window.__tallyHealthMock)return {H:window.__tallyHealthMock};if(!isNative)return {H:null};if(!HPL)HPL=(await import('@capgo/capacitor-health')).Health;return {H:HPL}}
 const hcOn=()=>{try{return localStorage.getItem('tally.hc.on')==='1'}catch(e){return false}};
 function hcPrefs(){let p={};try{p=JSON.parse(localStorage.getItem('tally.hc.prefs')||'{}')||{}}catch(e){}return Object.assign({steps:true,workouts:true,weight:true},p)}
 function setHcPrefs(p){try{localStorage.setItem('tally.hc.prefs',JSON.stringify(p))}catch(e){}}
@@ -1342,7 +1344,7 @@ async function hcConnect(){
   const step=x=>{S.hcStep=x;render()};
   try{
     step('Loading Health Connect…');
-    let H;try{H=await withTimeout(hp(),10000)}catch(e){diag('load: '+(e.message||e));throw new Error('the Health Connect module didn’t load ('+(e.message||e)+')')}
+    let H;try{H=(await withTimeout(hpBox(),10000)).H}catch(e){diag('load: '+(e.message||e));throw new Error('the Health Connect module didn’t load ('+(e.message||e)+')')}
     if(!H){S.hcMsg='Watch sync only works in the Tally Android app. This looks like the web version.';return}
     diag('loaded');
     step('Checking Health Connect is installed…');
@@ -1372,7 +1374,7 @@ let hcBusy=false,hcLastRun=0;
 async function hcSync(full,manual){
   if(hcBusy||!hcOn()||!S.uid)return;
   if(!full&&!manual&&Date.now()-hcLastRun<10*60000)return;
-  const H=await hp();if(!H)return;
+  const H=(await hpBox()).H;if(!H)return;
   hcBusy=true;hcLastRun=Date.now();S.hcSyncing=true;if(S.view==='profile')render();
   const prefs=hcPrefs();let added=0;const errs=[];
   try{
@@ -1434,7 +1436,7 @@ const HACT={
   hcconnect:()=>hcConnect(),
   hcsync:()=>hcSync(false,true),
   hcoff:()=>hcDisconnect(),
-  hcsettings:async()=>{let H=null;try{H=await hp()}catch(e){}if(!H){toast('Health Connect is only in the Android app');return}try{await H.openHealthConnectSettings()}catch(e){toast('Couldn’t open Health Connect: '+(e.message||e))}},
+  hcsettings:async()=>{let H=null;try{H=(await hpBox()).H}catch(e){}if(!H){toast('Health Connect is only in the Android app');return}try{await H.openHealthConnectSettings()}catch(e){toast('Couldn’t open Health Connect: '+(e.message||e))}},
 };
 
 /* ---------- sign-in ---------- */
