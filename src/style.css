@@ -300,3 +300,16 @@ a{color:var(--accent)}
 .chip{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:7px 12px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;font-weight:500}
 .chip small{font-weight:400;color:var(--ink3);font-size:12px}
 .chip.on{border-color:var(--accent);background:var(--accent-soft)}
+
+/* floating + button (Diary) */
+#fab{position:fixed;right:18px;bottom:calc(20px + env(safe-area-inset-bottom));z-index:18;display:flex;flex-direction:column;align-items:flex-end;gap:12px}
+.fabbtn{width:60px;height:60px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;cursor:pointer;box-shadow:0 6px 20px rgba(20,40,25,.35);transition:transform .2s}
+.fabbtn:active{transform:scale(.94)}
+#fab.open .fabbtn svg{transform:rotate(45deg)}.fabbtn svg{transition:transform .2s}
+.fabback{position:fixed;inset:0;background:rgba(15,15,10,.38);z-index:-1}
+.fabmenu{display:flex;flex-direction:column;align-items:flex-end;gap:8px;animation:fabin .16s ease-out}
+@keyframes fabin{from{opacity:0;transform:translateY(10px)}}
+.fabitem{display:flex;align-items:center;gap:10px;border:0;background:none;cursor:pointer;padding:0}
+.fabitem .fl{background:var(--card);color:var(--ink);padding:7px 12px;border-radius:10px;font-weight:500;font-size:14.5px;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+.fabitem .fi{width:46px;height:46px;border-radius:50%;background:var(--card);display:grid;place-items:center;font-size:20px;box-shadow:0 2px 10px rgba(0,0,0,.18);margin-right:7px}
+body:has(#fab) main{padding-bottom:110px}

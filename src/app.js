@@ -105,6 +105,7 @@ function render(){
   if(v==='trends')bindCharts();
   if(S.ws)ensureTick();
   updateDock();
+  updateFab();
 }
 function bar(v,t,color){const pct=t?Math.min(100,v/t*100):0;return `<div class="track"><i style="width:${pct}%;background:${color}"></i></div>`}
 function vDiary(){
@@ -321,11 +322,11 @@ function saveProfile(){
 
 /* ---------- modal ---------- */
 let M=null;
-function openModal(st){M=st;$('#modal').hidden=false;drawModal();document.body.style.overflow='hidden'}
-function closeModal(){M=null;$('#modal').hidden=true;$('#modal').innerHTML='';document.body.style.overflow=''}
+function openModal(st){M=st;S.fabOpen=false;updateFab();$('#modal').hidden=false;drawModal();document.body.style.overflow='hidden'}
+function closeModal(){M=null;$('#modal').hidden=true;$('#modal').innerHTML='';updateFab();document.body.style.overflow=''}
 function drawModal(focus){
   if(!M)return;
-  $('#modal').innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="${M.kind==='ex'?'Add exercise':M.kind==='routine'?'Routine':M.kind==='pick'?'Pick exercise':M.kind==='summary'?'Workout summary':'Add food'}">${M.kind==='ex'?exBody():M.kind==='round'?roundBody():M.kind==='routine'?routineBody():M.kind==='pick'?pickerBody():M.kind==='summary'?summaryBody():M.kind==='newchat'?newChatBody():M.kind==='newchal'?newChalBody():M.kind==='import'?importBody():foodBody()}</div>`;
+  $('#modal').innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="${M.kind==='ex'?'Add exercise':M.kind==='routine'?'Routine':M.kind==='pick'?'Pick exercise':M.kind==='summary'?'Workout summary':'Add food'}">${M.kind==='ex'?exBody():M.kind==='weight'?weightBody():M.kind==='round'?roundBody():M.kind==='routine'?routineBody():M.kind==='pick'?pickerBody():M.kind==='summary'?summaryBody():M.kind==='newchat'?newChatBody():M.kind==='newchal'?newChalBody():M.kind==='import'?importBody():foodBody()}</div>`;
   const f=$('#modal [autofocus]');if(f&&focus!==false)f.focus();
 }
 const mealName=k=>(MEALS.find(m=>m[0]===k)||MEALS[3])[1];
@@ -1219,6 +1220,35 @@ const SACT={
 
 
 
+
+/* ---------- floating + button on the Diary: quick log anything ---------- */
+const FAB_ITEMS=[['b','🍳','Breakfast'],['l','🥗','Lunch'],['d','🍝','Dinner'],['s','🍎','Snack'],['scan','📷','Scan a barcode'],['ex','🏃','Exercise'],['water','💧','Water +1 cup'],['wt','⚖️','Weight']];
+const mealNow=()=>{const h=new Date().getHours();return h<11?'b':h<15?'l':h<21?'d':'s'};
+function updateFab(){
+  const show=S.uid&&S.view==='diary'&&!M;let f=document.getElementById('fab');
+  if(!show){if(f)f.remove();return}
+  if(!f){f=document.createElement('div');f.id='fab';document.body.appendChild(f)}
+  const open=!!S.fabOpen;
+  f.className=open?'open':'';
+  f.innerHTML=(open?`<div class="fabback" data-act="fabclose"></div><div class="fabmenu" role="menu">${FAB_ITEMS.map(([k,i,l])=>`<button class="fabitem" role="menuitem" data-act="fabgo" data-k="${k}"><span class="fl">${esc(l)}</span><span class="fi" aria-hidden="true">${i}</span></button>`).join('')}</div>`:'')+
+    `<button class="fabbtn" data-act="fabtoggle" aria-label="${open?'Close quick log':'Quick log: food, exercise, water or weight'}" aria-expanded="${open}"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>`;
+}
+function weightBody(){const wt=weights()[S.date];return `<div class="sheet-h"><h3>Log weight</h3><button class="x" data-act="close" aria-label="Close">×</button></div><div class="sheet-b">
+  <label class="field">Weight on ${esc(S.date===today()?'today':nice(S.date,{weekday:'long',month:'short',day:'numeric'}))} (${wU()})<input id="wt-m" class="inp" type="number" step="0.1" min="0" inputmode="decimal" value="${wt!=null?wOut(wt).toFixed(1):''}" autofocus></label>
+  <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn primary" data-act="wtsave">Save</button></div></div>`}
+const FACT={
+  fabtoggle:()=>{S.fabOpen=!S.fabOpen;updateFab()},
+  fabclose:()=>{S.fabOpen=false;updateFab()},
+  fabgo:el=>{const k=el.dataset.k;S.fabOpen=false;
+    if('blds'.includes(k)&&k.length===1){loadDB();openModal({kind:'food',tab:'search',meal:k,q:''})}
+    else if(k==='scan'){loadDB();openModal({kind:'food',tab:'scan',meal:mealNow()})}
+    else if(k==='ex')openModal({kind:'ex'});
+    else if(k==='water'){const d=day(S.date);d.water=(d.water||0)+1;put(dk(S.date),d);toast(`💧 ${d.water} cup${d.water>1?'s':''} of water`)}
+    else if(k==='wt')openModal({kind:'weight'});
+    updateFab()},
+  wtsave:()=>{const v=parseFloat($('#wt-m').value);const doc=get('weights')||{e:{}};doc.e=doc.e||{};if(isNaN(v)||v<=0)delete doc.e[S.date];else doc.e[S.date]=r2(wIn(v));if(doc.hc)delete doc.hc[S.date];closeModal();put('weights',doc);toast(isNaN(v)?'Weight cleared':'⚖️ Weight logged')},
+};
+
 /* ---------- about / version ---------- */
 const VER=__TALLY_VERSION__;
 const verLabel=()=>`Version ${VER.version}`+(VER.build&&VER.build!=='dev'&&VER.build!=='web'?` (build ${VER.build})`:VER.build==='web'?' (web)':' (dev)');
@@ -1481,7 +1511,7 @@ const ACT={
   delcustom:el=>{const doc=get('custom')||{foods:[]};doc.foods=doc.foods.filter(f=>f.id!==el.dataset.id);put('custom',doc);toast('Food deleted')},
   export:async()=>{const txt=JSON.stringify(S.docs,null,1);try{await navigator.clipboard.writeText(txt);toast('Copied your data to the clipboard')}catch(e){toast('Copy was blocked by the browser')}}
 };
-Object.assign(ACT,WACT,SACT,AACT,HACT,MACT,VACT);
+Object.assign(ACT,WACT,SACT,AACT,HACT,MACT,VACT,FACT);
 document.addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');
   if(!el){if(e.target.id==='modal')closeModal();return}
@@ -1517,6 +1547,8 @@ document.addEventListener('change',e=>{
     if(!isNaN(hv))h.value=(im?hv/2.54:hv*2.54).toFixed(1);if(!isNaN(wv))w.value=(im?wv*2.20462:wv/2.20462).toFixed(1);$('#u-h').textContent=im?'in':'cm';$('#u-w').textContent=im?'lb':'kg'}
 });
 document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&S.fabOpen){S.fabOpen=false;updateFab();return}
+  if(e.key==='Enter'&&e.target.id==='wt-m'){e.preventDefault();ACT.wtsave();return}
   if(e.key==='Enter'&&!e.shiftKey){const id=e.target.id;if(id==='msg-in'){e.preventDefault();ACT.sendmsg();return}if(id==='inv-email'){e.preventDefault();ACT.sendinvite($('[data-act=sendinvite]'));return}if(id==='au-email'){e.preventDefault();ACT.ausend($('[data-act=ausend]'));return}if(id==='au-code'){e.preventDefault();ACT.auverify($('[data-act=auverify]'));return}}
   if(e.key==='Escape'&&M){closeModal();return}
   if(e.key==='Enter'&&M){const id=e.target.id;
