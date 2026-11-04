@@ -326,7 +326,7 @@ function openModal(st){M=st;S.fabOpen=false;updateFab();$('#modal').hidden=false
 function closeModal(){M=null;$('#modal').hidden=true;$('#modal').innerHTML='';updateFab();document.body.style.overflow=''}
 function drawModal(focus){
   if(!M)return;
-  $('#modal').innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="${M.kind==='ex'?'Add exercise':M.kind==='routine'?'Routine':M.kind==='pick'?'Pick exercise':M.kind==='summary'?'Workout summary':'Add food'}">${M.kind==='ex'?exBody():M.kind==='weight'?weightBody():M.kind==='round'?roundBody():M.kind==='routine'?routineBody():M.kind==='pick'?pickerBody():M.kind==='summary'?summaryBody():M.kind==='newchat'?newChatBody():M.kind==='together'?togetherBody():M.kind==='newchal'?newChalBody():M.kind==='import'?importBody():foodBody()}</div>`;
+  $('#modal').innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="${M.kind==='ex'?'Add exercise':M.kind==='routine'?'Routine':M.kind==='pick'?'Pick exercise':M.kind==='summary'?'Workout summary':'Add food'}">${M.kind==='ex'?exBody():M.kind==='weight'?weightBody():M.kind==='round'?roundBody():M.kind==='routine'?routineBody():M.kind==='pick'?pickerBody():M.kind==='summary'?summaryBody():M.kind==='newchat'?newChatBody():M.kind==='together'?togetherBody():M.kind==='howto'?howtoBody(false):M.kind==='build'?buildBody():M.kind==='newchal'?newChalBody():M.kind==='import'?importBody():foodBody()}</div>`;
   const f=$('#modal [autofocus]');if(f&&focus!==false)f.focus();
 }
 const mealName=k=>(MEALS.find(m=>m[0]===k)||MEALS[3])[1];
@@ -675,8 +675,8 @@ const EXLIB=[
 ['run','Running','Cardio','c',9.8],['walk','Walking','Cardio','c',3.5],['cycle','Cycling','Cardio','c',8],['bike','Stationary bike','Cardio','c',6.8],['row','Rowing machine','Cardio','c',7],['elliptical','Elliptical','Cardio','c',5],['swim','Swimming','Cardio','c',5.8],['stairs','Stair climber','Cardio','c',9],['rope','Jump rope','Cardio','c',11.8],['hike','Hiking','Cardio','c',6]
 ].map(([id,name,group,kind,met])=>({id,name,group,kind,met:met||null}));
 const STRENGTH_MET=5;
-function exList(){return EXLIB.concat(((get('exercises')||{}).list)||[])}
-function exById(id){return exList().find(e=>e.id===id)||{id,name:'Exercise',group:'Other',kind:'w'}}
+function exList(){return EXLIB.concat(((get('exercises')||{}).list)||[],S.tmpEx||[],FX.list)}
+function exById(id){return exIndex().get(id)||{id,name:FX.loaded||!/^fx:/.test(id)?'Exercise':'…',group:'Other',kind:'w'}}
 function routines(){return ((get('routines')||{}).list)||[]}
 function allWorkouts(){const out=[];for(const k of Object.keys(S.docs))if(k.startsWith('wk-'))for(const w of (S.docs[k].list||[]))out.push(w);return out.sort((a,b)=>(b.end||0)-(a.end||0))}
 const wkKey=date=>'wk-'+date.slice(0,7);
@@ -730,7 +730,7 @@ function vWorkouts(){
   const tab=S.wtab||'start';
   let h=`<div class="datebar"><h2>Workouts</h2><div class="seg-ctl" role="group">${[['start','Start'],['history','History'],['progress','Progress']].map(([k,l])=>`<button class="${tab===k?'on':''}" data-act="wtab" data-t="${k}">${l}</button>`).join('')}</div></div>`;
   if(tab==='start'){
-    h+=`<div class="grid"><div class="stack"><section class="card"><div class="spread"><h3 style="font-size:18px">Your routines</h3><span class="row"><button class="btn sm" data-act="newround">⏱ Round clock</button><button class="btn sm" data-act="newint">+ Interval timer</button><button class="btn sm primary" data-act="newroutine">+ New routine</button></span></div>`;
+    h+=`<div class="grid"><div class="stack"><section class="card"><div class="spread"><h3 style="font-size:18px">Your routines</h3><span class="row">${S.sample?'<button class="btn sm" data-act="buildopen">✨ Build with Claude</button>':''}<button class="btn sm" data-act="newround">⏱ Round clock</button><button class="btn sm" data-act="newint">+ Interval timer</button><button class="btn sm primary" data-act="newroutine">+ New routine</button></span></div>`;
     if(!rts.length)h+=`<p class="faint" style="margin:12px 0 0">No routines yet. Build one — like “Push day” or “5k easy run” — and start it with one tap. Or start an empty workout and add exercises as you go.</p>`;
     h+=`<div class="rlist">${rts.map(r=>{const sub=r.kind==='int'?(r.int.style==='round'?`${r.int.rounds} rounds · ${mmss(r.int.work)} / ${mmss(r.int.rest)} rest`:`${r.int.rounds} rounds · ${r.int.work}s work / ${r.int.rest}s rest`):r.items.map(t=>exById(t.ex).name).slice(0,4).join(', ')+(r.items.length>4?` +${r.items.length-4} more`:'');
       return `<div class="rrow"><div class="t"><div class="nm">${esc(r.name)}${r.kind==='int'?(r.int.style==='round'?' <span class="tag">Round clock</span>':' <span class="tag">Intervals</span>'):''}</div><div class="sub">${esc(sub)||'Empty'}</div></div><button class="btn ghost sm" data-act="rtshare" data-id="${r.id}" aria-label="Share or work out together" title="Share or work out together">👥</button><button class="btn ghost sm" data-act="editroutine" data-id="${r.id}">Edit</button><button class="btn sm primary" data-act="startroutine" data-id="${r.id}">Start</button></div>`}).join('')}</div>
@@ -798,7 +798,7 @@ function vSession(){
   let h=`<div class="datebar"><h2><input id="ws-name" class="titleinp" value="${esc(w.name)}" aria-label="Workout name"></h2><span class="faint" id="ws-clock">${mmss(el)}</span><button class="btn ghost" data-act="wsdiscard">Discard</button><button class="btn primary" data-act="wsfinish">Finish</button></div><div class="stack" style="max-width:760px">${tgIn()?`<div id="tg-strip">${tgStrip()}</div>`:''}`;
   w.items.forEach((it,ii)=>{const ex=exById(it.ex);const prev=lastSets(it.ex);
     const cols=ex.kind==='w'?[wU(),'Reps']:ex.kind==='bw'?['Reps','+'+wU()]:ex.kind==='t'?['Seconds']:['Minutes',distU()];
-    h+=`<section class="card ses"><div class="spread"><h3 style="font-size:18px">${esc(ex.name)}</h3><span class="row"><span class="faint resttxt">${ex.kind==='c'?'':`Rest ${mmss(it.rest)}`}</span><button class="btn ghost sm" data-act="wsmove" data-i="${ii}" data-d="-1" aria-label="Move up">↑</button><button class="btn ghost sm" data-act="wsmove" data-i="${ii}" data-d="1" aria-label="Move down">↓</button><button class="x" data-act="wsrmex" data-i="${ii}" aria-label="Remove ${esc(ex.name)}">×</button></span></div>${tgIn()?`<div class="tgpart" data-ex="${esc(it.ex)}">${tgPartnerSets(it.ex)}</div>`:''}
+    h+=`<section class="card ses"><div class="spread"><h3 style="font-size:18px">${esc(ex.name)}${fxRow(ex.id)?` <button class="hxi" data-act="howto" data-id="${esc(ex.id)}" aria-label="How to do ${esc(ex.name)}">ⓘ</button>`:''}</h3><span class="row"><span class="faint resttxt">${ex.kind==='c'?'':`Rest ${mmss(it.rest)}`}</span><button class="btn ghost sm" data-act="wsmove" data-i="${ii}" data-d="-1" aria-label="Move up">↑</button><button class="btn ghost sm" data-act="wsmove" data-i="${ii}" data-d="1" aria-label="Move down">↓</button><button class="x" data-act="wsrmex" data-i="${ii}" aria-label="Remove ${esc(ex.name)}">×</button></span></div>${tgIn()?`<div class="tgpart" data-ex="${esc(it.ex)}">${tgPartnerSets(it.ex)}</div>`:''}
     <div class="sets" style="--nc:${cols.length}"><div class="sh"><span>Set</span><span>Previous</span>${cols.map(c=>`<span>${esc(c)}</span>`).join('')}<span>✓</span></div>`;
     it.sets.forEach((st,si)=>{const ps=prev&&prev[si];
       const f=(k,val,ph)=>`<input class="inp si" inputmode="decimal" data-i="${ii}" data-s="${si}" data-k="${k}" value="${val}" placeholder="${ph||''}">`;
@@ -917,7 +917,7 @@ function intTick(){
 const ROUND_PRESETS=[['Boxing',{work:180,rest:60,rounds:12}],['Amateur boxing',{work:180,rest:60,rounds:3}],['MMA',{work:300,rest:60,rounds:5}],['Muay Thai',{work:180,rest:120,rounds:5}],['Kickboxing',{work:120,rest:60,rounds:3}],['Bag work',{work:180,rest:30,rounds:6}]];
 const parseMS=v=>{v=String(v||'').trim();if(/^\d+:\d{1,2}$/.test(v)){const [m,s2]=v.split(':').map(Number);return m*60+s2}const n=parseFloat(v);return isNaN(n)?0:Math.round(n*60)};
 function roundBody(){const r=M.r,I=r.int;
-  return `<div class="sheet-h"><h3>${M.isNew?'Round clock':'Edit round clock'}</h3><button class="x" data-act="close" aria-label="Close">×</button></div><div class="sheet-b">
+  return `<div class="sheet-h"><h3>${M.isNew?'Round clock':'Edit round clock'}</h3><button class="x" data-act="close" aria-label="Close">×</button></div><div class="sheet-b">${M.aiNote?`<div class="notice" style="margin-bottom:12px">✨ ${esc(M.aiNote)} <span class="faint">— check it over and adjust anything before saving.</span></div>`:''}
   <div class="chips">${ROUND_PRESETS.map(([n,v])=>`<button class="chip ${r.name===n?'on':''}" data-act="rpreset" data-n="${esc(n)}">${esc(n)}<small>${v.rounds} × ${mmss(v.work)}</small></button>`).join('')}</div>
   <label class="field" style="margin-top:12px">Name<input id="r-name" class="inp" value="${esc(r.name)}"></label>
   <div class="fgrid" style="margin-top:12px">
@@ -929,7 +929,7 @@ function roundBody(){const r=M.r,I=r.int;
   </div>
   <p class="faint" id="rc-total">Total: ${mmss(intPlan(I).reduce((a,x)=>a+x[1],0))} · bell starts and ends each round${+I.warn?`, knock ${I.warn}s before the end`:''}</p>
   <div class="row" style="justify-content:flex-end">${M.isNew?'':'<button class="btn ghost" data-act="delroutine">Delete</button>'}<button class="btn" data-act="saveroutine">Save to routines</button><button class="btn primary" data-act="rcstart">Start</button></div></div>`}
-function readRound(){if(!M||!M.r||M.r.int.style!=='round')return;const I=M.r.int,n=$('#r-name');if(n)M.r.name=n.value;
+function readRound(){if(!M||!M.r||!M.r.int||M.r.int.style!=='round')return;const I=M.r.int,n=$('#r-name');if(n)M.r.name=n.value;
   const g=id=>{const e=$('#'+id);return e?e.value:null};
   if(g('rc-work')!=null){I.work=Math.max(5,parseMS(g('rc-work')));I.rest=Math.max(0,parseMS(g('rc-rest')));I.rounds=Math.max(1,Math.min(50,parseInt(g('rc-rounds'))||1));I.warm=Math.max(0,parseInt(g('rc-warm'))||0);I.warn=Math.max(0,Math.min(I.work-1,parseInt(g('rc-warn'))||0))}}
 /* ---------- routine editor (modal) ---------- */
@@ -938,12 +938,12 @@ function routineBody(){
   if(M.pick)return pickerBody();
   if(r.kind==='int'){const I=r.int;const f=(k,l)=>`<label class="field">${l}<input class="inp" type="number" min="0" data-ik="${k}" value="${I[k]}"></label>`;
     const tot=intPlan(I).reduce((a,x)=>a+x[1],0);
-    return `<div class="sheet-h"><h3>${M.isNew?'New interval timer':'Edit interval timer'}</h3><button class="x" data-act="close" aria-label="Close">×</button></div><div class="sheet-b">
+    return `<div class="sheet-h"><h3>${M.isNew?'New interval timer':'Edit interval timer'}</h3><button class="x" data-act="close" aria-label="Close">×</button></div><div class="sheet-b">${M.aiNote?`<div class="notice" style="margin-bottom:12px">✨ ${esc(M.aiNote)} <span class="faint">— check it over and adjust anything before saving.</span></div>`:''}
     <label class="field">Name<input id="r-name" class="inp" value="${esc(r.name)}"></label>
     <div class="fgrid" style="margin-top:12px">${f('warm','Warm-up (sec)')}${f('work','Work (sec)')}${f('rest','Rest (sec)')}${f('rounds','Rounds')}${f('cool','Cool-down (sec)')}</div>
     <p class="faint" id="int-total">Total: ${mmss(tot)}</p>
     <div class="row" style="justify-content:flex-end">${M.isNew?'':'<button class="btn ghost" data-act="delroutine">Delete</button>'}<button class="btn primary" data-act="saveroutine">Save</button></div></div>`}
-  return `<div class="sheet-h"><h3>${M.isNew?'New routine':'Edit routine'}</h3><button class="x" data-act="close" aria-label="Close">×</button></div><div class="sheet-b">
+  return `<div class="sheet-h"><h3>${M.isNew?'New routine':'Edit routine'}</h3><button class="x" data-act="close" aria-label="Close">×</button></div><div class="sheet-b">${M.aiNote?`<div class="notice" style="margin-bottom:12px">✨ ${esc(M.aiNote)} <span class="faint">— check it over and adjust anything before saving.</span></div>`:''}
   <label class="field">Name<input id="r-name" class="inp" value="${esc(r.name)}" placeholder="e.g. Push day, Leg day, Easy 5k"></label>
   <div class="rlist" style="margin-top:12px">${r.items.map((t,i)=>{const ex=exById(t.ex);
     const n=(k,l,v,st)=>`<label class="mini">${l}<input class="inp" type="number" min="0" step="${st||1}" data-ri="${i}" data-rk="${k}" value="${v??''}"></label>`;
@@ -955,20 +955,21 @@ function routineBody(){
   <div class="row" style="justify-content:flex-end;margin-top:14px">${M.isNew?'':'<button class="btn ghost" data-act="delroutine">Delete</button>'}<button class="btn primary" data-act="saveroutine">Save routine</button></div></div>`;
 }
 function pickerBody(){
-  const q=(M.pq||'').toLowerCase();const groups={};
-  for(const e of exList())if(!q||(e.name+' '+e.group).toLowerCase().includes(q))(groups[e.group]=groups[e.group]||[]).push(e);
+  if(M.howto)return howtoBody(true);loadFx();
   return `<div class="sheet-h"><button class="btn ghost sm" data-act="pickback" style="white-space:nowrap">‹ Back</button><h3 style="margin-left:4px">Add exercise</h3><button class="x" data-act="close" aria-label="Close">×</button></div><div class="sheet-b">
-  <input id="pq" class="inp" placeholder="Search exercises" value="${esc(M.pq||'')}" autofocus autocomplete="off">
-  <div class="results" id="pres">${pickList(groups)}</div>
+  <input id="pq" class="inp" placeholder="Search ${FX.loaded?exList().length+' ':''}exercises" value="${esc(M.pq||'')}" autofocus autocomplete="off">
+  <div class="row" style="margin-top:8px"><select id="pg" class="inp" style="flex:1;min-width:0"><option value="">All muscle groups</option>${GROUPS.map(g=>`<option ${M.pg===g?'selected':''}>${g}</option>`).join('')}</select><select id="pe" class="inp" style="flex:1;min-width:0">${EQ_FILTERS.map(([v,l])=>`<option value="${v}" ${(M.pe||'')===v?'selected':''}>${l}</option>`).join('')}</select></div>
+  <div class="results" id="pres">${pickResults()}</div>
   <details style="margin-top:12px"><summary>Create a custom exercise</summary><div class="row" style="margin-top:8px"><input id="cx-name" class="inp" placeholder="Name" style="flex:1;min-width:160px"><select id="cx-kind" class="inp" style="width:auto"><option value="w">Weight × reps</option><option value="bw">Bodyweight reps</option><option value="t">Timed hold</option><option value="c">Cardio (time + distance)</option></select><button class="btn" data-act="cxsave">Create</button></div></details></div>`;
 }
-function pickList(groups){const ks=Object.keys(groups);if(!ks.length)return '<div class="empty" style="border:0">No match — create it below.</div>';return ks.map(g=>`<div class="group">${esc(g)}</div>`+groups[g].map(e=>`<button class="res" data-act="pickex" data-id="${e.id}"><span class="t"><div class="nm">${esc(e.name)}</div><div class="sub">${({w:'Weight × reps',bw:'Bodyweight',t:'Timed',c:'Cardio'})[e.kind]}</div></span></button>`).join('')).join('')}
+function pickList(groups){const ks=Object.keys(groups);if(!ks.length)return '<div class="empty" style="border:0">No match — create it below.</div>';return ks.map(g=>`<div class="group">${esc(g)}</div>`+groups[g].map(e=>{const row=fxRow(e.id);return `<div class="resrow"><button class="res" data-act="pickex" data-id="${esc(e.id)}"><span class="t"><div class="nm">${esc(e.name)}</div><div class="sub">${({w:'Weight × reps',bw:'Bodyweight',t:'Timed',c:'Cardio'})[e.kind]}${row&&row.eq&&row.eq!=='other'&&row.eq!=='body only'?' · '+esc(row.eq):''}</div></span></button>${row?`<button class="hxi" data-act="howto" data-id="${esc(e.id)}" aria-label="How to do ${esc(e.name)}">ⓘ</button>`:''}</div>`}).join('')).join('')}
 function readRoutineInputs(){if(!M||!M.r)return;const n=$('#r-name');if(n)M.r.name=n.value;
   document.querySelectorAll('[data-rk]').forEach(el=>{const t=M.r.items[+el.dataset.ri],k=el.dataset.rk,v=parseFloat(el.value);t[k]=isNaN(v)?'':(k==='wt'?r2(wIn(v)):k==='dist'?r2(dIn(v)):v)});
   document.querySelectorAll('[data-ik]').forEach(el=>{const v=parseFloat(el.value);M.r.int[el.dataset.ik]=isNaN(v)?0:Math.max(0,Math.round(v))})}
 function saveRoutine(){readRoutineInputs();readRound();const r=M.r;if(!r.name.trim()){toast('Give the routine a name');return}
   if(r.kind!=='int'&&!r.items.length){toast('Add at least one exercise');return}
   if(r.kind==='int'&&(!r.int.work||!r.int.rounds)){toast('Set work time and rounds');return}
+  const used=new Set((r.items||[]).map(t=>t.ex)),tmp=(S.tmpEx||[]).filter(e=>used.has(e.id));if(tmp.length){const xd=get('exercises')||{list:[]};xd.list=(xd.list||[]).concat(tmp);put('exercises',xd);S.tmpEx=(S.tmpEx||[]).filter(e=>!used.has(e.id))}
   const doc=get('routines')||{list:[]};doc.list=doc.list||[];const i=doc.list.findIndex(x=>x.id===r.id);if(i>=0)doc.list[i]=r;else doc.list.push(r);
   closeModal();put('routines',doc);toast('Routine saved')}
 
@@ -1473,7 +1474,7 @@ function importBody(){return `<div class="sheet-h"><h3>Import from Tally web</h3
 function start(user){
   S.uid=user.id;S.email=user.email;
   STORE=createStore({uid:user.id,onChange:(what)=>{S.docs=STORE.docs;syncNote();if(what==='docs'){afterChange();render()}}});
-  S.docs=STORE.docs;socialRealtime();route();loadSocial();loadTogether();
+  S.docs=STORE.docs;socialRealtime();route();loadSocial();loadTogether();loadFx();
   if(isNative)setTimeout(()=>checkUpdate(false),4000);
   if(hcNative()){setTimeout(()=>hcSync(false),2500);import('@capacitor/app').then(({App})=>App.addListener('resume',()=>hcSync(false))).catch(()=>{})}
 }
@@ -1504,7 +1505,7 @@ function toast(t){let el=$('.toast');if(!el){el=document.createElement('div');el
 function rtSummary(r){if(!r)return '';if(r.kind==='int'||r.int){const I=r.int;return I.style==='round'?`${I.rounds} rounds · ${mmss(I.work)} / ${mmss(I.rest)} rest`:`${I.rounds} rounds · ${I.work}s work / ${I.rest}s rest`}
   const defs=r.exDefs||[],n=(r.items||[]).map(t=>{const d=defs.find(x=>x.id===t.ex);return d?d.name:exById(t.ex).name});return n.slice(0,4).join(', ')+(n.length>4?` +${n.length-4} more`:'')}
 function routinePayload(r){const p=clone(r);delete p.id;const lib=new Set(EXLIB.map(e=>e.id)),ids=new Set((p.items||[]).map(t=>t.ex));
-  p.exDefs=exList().filter(e=>ids.has(e.id)&&!lib.has(e.id));return p}
+  p.exDefs=exList().filter(e=>ids.has(e.id)&&!lib.has(e.id)&&!/^fx:/.test(e.id));return p}
 function addExDefs(defs){if(!defs||!defs.length)return;const have=new Set(exList().map(e=>e.id)),add=defs.filter(d=>d&&d.id&&!have.has(d.id));
   if(!add.length)return;const doc=get('exercises')||{list:[]};doc.list=(doc.list||[]).concat(add);put('exercises',doc)}
 function saveSharedRoutine(p){const r=clone(p);addExDefs(r.exDefs);delete r.exDefs;r.id='r'+newId();
@@ -1706,6 +1707,101 @@ document.addEventListener('change',e=>{const t=e.target;
 // Remove the person's photos too when they delete their account
 async function ciDeleteAllPhotos(){try{const {data}=await sb.storage.from(CI_BUCKET).list(S.uid,{limit:1000});if(data&&data.length)await sb.storage.from(CI_BUCKET).remove(data.map(f=>`${S.uid}/${f.name}`))}catch(e){}}
 
+/* ---------- exercise library (free-exercise-db, public domain) + How-to ---------- */
+const FX={list:[],byId:{},link:{},imgBase:'',loaded:false,loading:null};
+function loadFx(){if(FX.loading)return FX.loading;FX.loading=fetch('data/exercises.json').then(r=>r.json()).then(d=>{
+  FX.imgBase=d.imgBase;FX.link=d.link||{};
+  for(const x of d.list){FX.byId[x.id]=x;if(!x.dup)FX.list.push({id:x.id,name:x.n,group:x.g,kind:x.k,met:x.k==='c'?7:null})}
+  FX.loaded=true;_exIdx=null;if(S.view==='workouts'||S.view==='trends')render();if(M&&(M.pick||M.kind==='pick'||M.kind==='howto'))drawModal(false);
+}).catch(()=>{FX.loading=null});return FX.loading}
+let _exIdx=null,_exRef=null,_exTmp=0;
+function exIndex(){const ref=get('exercises');if(!_exIdx||_exRef!==ref||_exTmp!==(S.tmpEx||[]).length){_exRef=ref;_exTmp=(S.tmpEx||[]).length;_exIdx=new Map();for(const e of exList())_exIdx.set(e.id,e)}return _exIdx}
+const fxRow=id=>FX.byId[id]||FX.byId[FX.link[id]]||null;
+const EQ_FILTERS=[['','Any equipment'],['body only','Body only'],['dumbbell','Dumbbell'],['barbell','Barbell'],['kettlebells','Kettlebell'],['cable','Cable'],['machine','Machine'],['bands','Bands'],['other','Other']];
+const GROUPS=['Chest','Back','Shoulders','Arms','Legs','Glutes','Core','Full body','Cardio','Stretching','Neck','Custom'];
+function pickResults(){
+  const q=(M.pq||'').toLowerCase().trim(),g=M.pg||'',eq=M.pe||'';
+  const all=exList(),mine=EXLIB.concat(((get('exercises')||{}).list)||[],S.tmpEx||[]);
+  const pool=!q&&!g&&!eq?mine:all;
+  const words=q.split(/\s+/).filter(Boolean);
+  let res=pool.filter(e=>{const row=fxRow(e.id);
+    if(g&&e.group!==g)return false;if(eq&&!(row&&row.eq===eq))return false;
+    const hay=(e.name+' '+e.group+' '+(row?row.pm.join(' ')+' '+row.eq:'')).toLowerCase();return words.every(w=>hay.includes(w))});
+  if(q)res.sort((a,b)=>(b.name.toLowerCase().startsWith(q)-a.name.toLowerCase().startsWith(q))||(mine.includes(b)-mine.includes(a))||a.name.length-b.name.length);
+  const more=res.length>80;res=res.slice(0,80);
+  const groups={};for(const e of res)(groups[e.group]=groups[e.group]||[]).push(e);
+  return pickList(groups)+(more?'<p class="faint" style="padding:8px 4px">Showing the first 80 — type more to narrow it down.</p>':'')+
+    (!q&&!g&&!eq?`<p class="faint" style="padding:8px 4px">${FX.loaded?`Search or filter to see all ${exList().length} exercises.`:'<span class="spin"></span> Loading the full exercise library…'}</p>`:'')}
+function howtoBody(inPicker){const e=exById(M.howto||M.id),row=fxRow(e.id);
+  const back=`<button class="btn ghost sm" data-act="howtoback" style="white-space:nowrap">‹ Back</button>`;
+  if(!row)return `<div class="sheet-h">${back}<h3>${esc(e.name)}</h3><button class="x" data-act="close" aria-label="Close">×</button></div><div class="sheet-b"><p class="faint">No how-to for this exercise yet.</p></div>`;
+  const chips=[row.lv&&row.lv[0].toUpperCase()+row.lv.slice(1),row.eq&&row.eq!=='other'&&row.eq[0].toUpperCase()+row.eq.slice(1)].filter(Boolean);
+  return `<div class="sheet-h">${back}<h3 style="margin-left:4px">${esc(e.name)}</h3><button class="x" data-act="close" aria-label="Close">×</button></div><div class="sheet-b">
+  ${row.img.length?`<div class="hximg">${row.img.slice(0,2).map((p,i)=>`<figure><img src="${esc(FX.imgBase+p)}" alt="${esc(e.name)} — ${i?'finish':'start'}" loading="lazy"><figcaption>${i?'Finish':'Start'}</figcaption></figure>`).join('')}</div>`:''}
+  <div class="chips" style="margin:10px 0 4px">${chips.map(c=>`<span class="tag">${esc(c)}</span>`).join('')}${row.pm.map(m=>`<span class="tag mine">${esc(m)}</span>`).join('')}${row.sm.map(m=>`<span class="tag">${esc(m)}</span>`).join('')}</div>
+  ${row.ins.length?`<ol class="hxsteps">${row.ins.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`:''}
+  <p class="faint" style="font-size:12px">From free-exercise-db (public domain). Move within a comfortable range and stop if anything hurts.</p>
+  ${inPicker?`<div class="row floatadd"><button class="btn primary" data-act="pickex" data-id="${esc(e.id)}">Add ${esc(e.name)}</button></div>`:''}</div>`}
+
+/* ---------- build a routine with Claude ---------- */
+const BUILD_EXAMPLES=['3-day full body, dumbbells only, 45 min','Push day for hypertrophy','20-minute bodyweight HIIT at home','Boxing bag rounds, 6 × 3 min','Beginner 5k run plan session'];
+function buildBody(){const b=M;
+  return `<div class="sheet-h"><h3>✨ Build a routine with Claude</h3><button class="x" data-act="close" aria-label="Close">×</button></div><div class="sheet-b">
+  <label class="field">What do you want to train?<textarea id="bd-in" class="inp" rows="3" placeholder="e.g. Upper body, 45 minutes, dumbbells and a bench, intermediate" ${b.busy?'disabled':''}>${esc(b.text||'')}</textarea></label>
+  <div class="chips" style="margin-top:8px">${BUILD_EXAMPLES.map(x=>`<button class="chip" data-act="bdex" data-t="${esc(x)}">${esc(x)}</button>`).join('')}</div>
+  <div class="row" style="margin-top:12px"><label class="btn">${b.photo?'📷 Change photo':'📷 Photo of a workout plan'}<input type="file" id="bd-file" accept="image/*" hidden></label>${b.photo?`<span class="faint">${esc(b.photoName||'Photo added')} <button class="x sm" data-act="bdnophoto" aria-label="Remove photo">×</button></span>`:'<span class="faint">optional — a printed program, whiteboard or screenshot</span>'}</div>
+  ${b.err?`<div class="notice warn" style="margin-top:12px">${esc(b.err)}</div>`:''}
+  <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn primary" data-act="bdrun" ${b.busy?'disabled':''}>${b.busy?'<span class="spin"></span> Building…':'Build routine'}</button></div>
+  <p class="faint" style="font-size:12px;margin:8px 0 0">You can change anything before saving. Claude’s plan is a starting point, not medical advice.</p></div>`}
+const normEx=s=>String(s||'').toLowerCase().replace(/[^a-z0-9 ]+/g,' ').split(/\s+/).filter(w=>w&&!['the','a','an','with','and','on','of','to','exercise'].includes(w)).map(w=>w.length>3&&w.endsWith('s')&&!w.endsWith('ss')?w.slice(0,-1):w);
+let _fxTok=null;
+function matchEx(name){const a=new Set(normEx(name));if(!a.size)return null;
+  const mine=EXLIB.concat(((get('exercises')||{}).list)||[],S.tmpEx||[]);
+  if(!_fxTok||_fxTok.n!==FX.list.length)_fxTok={n:FX.list.length,list:FX.list.map(e=>[e,new Set(normEx(e.name))])};
+  let best=null,bs=0;const score=(e,b,bonus)=>{let i=0;for(const w of a)if(b.has(w))i++;const s=i/(a.size+b.size-i)+(bonus||0);if(s>bs){bs=s;best=e}};
+  for(const e of mine){score(e,new Set(normEx(e.name)),.12);const al=FX.link[e.id]&&FX.byId[FX.link[e.id]];if(al)score(e,new Set(normEx(al.n)),.12)}for(const [e,b] of _fxTok.list)score(e,b,0);
+  return bs>=.5?best:null}
+function routineFromAi(j){
+  if(/interval|round/i.test(j.kind||'')){const round=/round/i.test(j.style||'');
+    return {kind:round?'round':'routine',r:{id:'r'+newId(),name:String(j.name||(round?'Rounds':'Intervals')).slice(0,40),kind:'int',int:round?{style:'round',warm:+j.warmup||10,work:+j.work||180,rest:+j.rest||60,rounds:+j.rounds||6,warn:10,cool:0}:{warm:+j.warmup||60,work:+j.work||40,rest:+j.rest||20,rounds:+j.rounds||8,cool:+j.cooldown||60}}}}
+  const KIND={weight:'w',bodyweight:'bw',timed:'t',cardio:'c'};S.tmpEx=S.tmpEx||[];const items=[];
+  for(const it of (j.items||[]).slice(0,20)){if(!it||!it.exercise)continue;let ex=matchEx(it.exercise);
+    if(!ex){ex={id:'x'+newId(),name:String(it.exercise).slice(0,60),group:'Custom',kind:KIND[it.type]||'w',met:it.type==='cardio'?7:null};S.tmpEx.push(ex)}
+    const n=v=>{v=parseInt(v);return isNaN(v)||v<=0?null:v};
+    items.push(ex.kind==='c'?{ex:ex.id,min:n(it.minutes)||20,dist:''}:ex.kind==='t'?{ex:ex.id,sets:n(it.sets)||3,secs:n(it.seconds)||45,rest:n(it.rest)||60}:{ex:ex.id,sets:n(it.sets)||3,reps:n(it.reps)||10,wt:'',rest:n(it.rest)||90})}
+  if(!items.length)return null;
+  return {kind:'routine',r:{id:'r'+newId(),name:String(j.name||'New routine').slice(0,40),kind:'std',items},note:j.notes?String(j.notes).slice(0,300):''}}
+async function buildRun(){const ta=$('#bd-in');M.text=ta?ta.value.trim():M.text;if(!M.text&&!M.photo){M.err='Describe what you want, or add a photo of a plan.';drawModal(false);return}
+  if(!S.sample){M.err='Claude features aren’t available right now.';drawModal(false);return}
+  M.busy=true;M.err='';drawModal(false);await loadFx().catch(()=>{});
+  const names=EXLIB.map(e=>e.name).join(', ');
+  const prompt=`You are an experienced strength and conditioning coach building one workout routine for the Tally app.
+${M.photo?'The attached photo shows a workout plan. Turn it into a routine faithfully — keep its exercises, sets, reps and times; read every line. Use the request below only as extra guidance.\n':''}Request: ${M.text||'(see photo)'}
+Units: ${imperial()?'pounds, miles':'kilograms, kilometres'}.
+Reply with ONLY one JSON object, no prose and no code fences, in one of these shapes:
+Strength / cardio / mixed: {"name":"short name, max 40 chars","kind":"std","notes":"one short sentence of guidance","items":[{"exercise":"common exercise name","type":"weight|bodyweight|timed|cardio","sets":3,"reps":10,"seconds":45,"minutes":20,"rest":90}]}
+Only include seconds for timed holds and minutes for cardio. For a rep range give the lower number. rest is in seconds.
+Interval or round timer (only for things like HIIT, tabata or boxing rounds that are one repeating timer): {"name":"…","kind":"interval","style":"interval|round","work":40,"rest":20,"rounds":8,"warmup":60}
+Use these exercise names when they fit: ${names}. Otherwise use clear, standard gym names (e.g. "Dumbbell Bench Press", "Cable Crossover", "Box Jump").
+Match the time, equipment and level asked for; usually 4–8 exercises. Keep it safe and realistic.`;
+  try{const imgs=M.photo?[await shrinkPhoto(M.photo,1600)]:[];const r=await S.sample(prompt,{images:imgs});
+    const m=String(r.text||'').match(/\{[\s\S]*\}/);if(!m)throw new Error('Claude didn’t return a routine — try rewording.');
+    const out=routineFromAi(JSON.parse(m[0]));if(!out)throw new Error('Claude didn’t include any exercises — try adding more detail.');
+    openModal({kind:out.kind,isNew:true,r:out.r,aiNote:out.note||'Built by Claude'});
+  }catch(e){M.busy=false;M.err=e.code?aiErrMsg(e):(e.message||'Something went wrong');drawModal(false)}}
+const XACT={
+  howto:el=>{const id=el.dataset.id;loadFx();if(M&&(M.pick||M.kind==='pick')){M.howto=id;drawModal(false);$('#modal').scrollTop=0}else openModal({kind:'howto',id})},
+  howtoback:()=>{if(M.kind==='howto'){closeModal();return}M.howto=null;drawModal(false)},
+  buildopen:()=>{openModal({kind:'build',text:''});loadFx()},
+  bdex:el=>{M.text=el.dataset.t;drawModal(false)},
+  bdnophoto:()=>{M.photo=null;M.photoName='';drawModal(false)},
+  bdrun:()=>buildRun(),
+};
+document.addEventListener('change',e=>{const t=e.target;
+  if(t.id==='bd-file'&&t.files&&t.files[0]&&M&&M.kind==='build'){const ta=$('#bd-in');if(ta)M.text=ta.value;M.photo=t.files[0];M.photoName=t.files[0].name;M.err='';drawModal(false)}
+  if((t.id==='pg'||t.id==='pe')&&M){M[t.id]=t.value;loadFx();const r=$('#pres');if(r)r.innerHTML=pickResults()}
+});
+
 const ACT={
   day:el=>{S.date=addDays(S.date,+el.dataset.n);render()},
   today:()=>{S.date=today();render()},
@@ -1748,7 +1844,7 @@ const ACT={
   delcustom:el=>{const doc=get('custom')||{foods:[]};doc.foods=doc.foods.filter(f=>f.id!==el.dataset.id);put('custom',doc);toast('Food deleted')},
   export:async()=>{const txt=JSON.stringify(S.docs,null,1);try{await navigator.clipboard.writeText(txt);toast('Copied your data to the clipboard')}catch(e){toast('Copy was blocked by the browser')}}
 };
-Object.assign(ACT,WACT,SACT,AACT,HACT,MACT,VACT,FACT,TACT,CACT);
+Object.assign(ACT,WACT,SACT,AACT,HACT,MACT,VACT,FACT,TACT,CACT,XACT);
 document.addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');
   if(!el){if(e.target.id==='modal')closeModal();return}
@@ -1762,7 +1858,7 @@ document.addEventListener('input',e=>{
   else if(id==='ai-in'&&M)M.aiText=e.target.value;
   else if(id==='ws-name'&&S.ws){S.ws.name=e.target.value;saveWs()}
   else if(e.target.classList.contains('si')&&S.ws)wsInput(e.target);
-  else if(id==='pq'&&M){M.pq=e.target.value;const q=M.pq.toLowerCase(),g={};for(const x of exList())if(!q||(x.name+' '+x.group).toLowerCase().includes(q))(g[x.group]=g[x.group]||[]).push(x);$('#pres').innerHTML=pickList(g)}
+  else if(id==='pq'&&M){M.pq=e.target.value;$('#pres').innerHTML=pickResults()}
   else if(/^rc-/.test(id)&&M&&M.kind==='round'){readRound();const t=$('#rc-total');if(t)t.textContent='Total: '+mmss(intPlan(M.r.int).reduce((a,x)=>a+x[1],0))+' · bell starts and ends each round'+(+M.r.int.warn?`, knock ${M.r.int.warn}s before the end`:'')}
   else if(e.target.dataset.ik!==undefined&&M&&M.r){readRoutineInputs();const t=$('#int-total');if(t)t.textContent='Total: '+mmss(intPlan(M.r.int).reduce((a,x)=>a+x[1],0))}
 });
