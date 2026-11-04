@@ -77,6 +77,13 @@ npm run build && npx vite preview --port 4173 &
 node tests/together.e2e.cjs
 ```
 
+Weekly check-in test (fake Supabase incl. Storage and the claude function):
+```
+node tests/checkin.e2e.cjs <folder with front.jpg right.jpg left.jpg back.jpg>
+```
+
+Check-in photos need the private `checkins` storage bucket: run `supabase/migrations/20261104000000_checkin_photos.sql` once in the SQL editor.
+
 ## Data credits
 - Health Canada, Canadian Nutrient File (2015) — Open Government Licence – Canada
 - USDA ARS, National Nutrient Database for Standard Reference, Release 28 — public domain

@@ -96,11 +96,11 @@ function targets(date){
 /* ---------- rendering ---------- */
 function render(){
   const v=S.view;
-  document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('on',a.dataset.v===v));
+  document.querySelectorAll('nav a,a.cog').forEach(a=>a.classList.toggle('on',a.dataset.v===v));
   const ae=document.activeElement;
-  if((v==='profile'||v==='workouts'||v==='social')&&ae&&ae.closest&&ae.closest('#view')&&/INPUT|SELECT/.test(ae.tagName)&&!S._force)return; // don't clobber typing
+  if((v==='profile'||v==='workouts'||v==='social'||v==='checkin')&&ae&&ae.closest&&ae.closest('#view')&&/INPUT|SELECT/.test(ae.tagName)&&!S._force)return; // don't clobber typing
   if(!S.uid){$('#view').innerHTML=vAuth();document.body.classList.add('signedout');return}document.body.classList.remove('signedout');
-  const fn={diary:vDiary,workouts:vWorkouts,social:vSocial,trends:vTrends,foods:vFoods,profile:vProfile}[v]||vDiary;
+  const fn={diary:vDiary,workouts:vWorkouts,social:vSocial,trends:vTrends,foods:vFoods,profile:vProfile,checkin:vCheckin}[v]||vDiary;
   $('#view').innerHTML=tgBanner()+fn();
   if(v==='trends')bindCharts();
   if(S.ws)ensureTick();
@@ -1461,7 +1461,7 @@ const AACT={
     AU.busy=true;AU.err='';render();try{const u=await verifyCode(AU.email,c);AU={step:'email',email:'',busy:false,err:''};start(u)}catch(err){AU.busy=false;AU.err='That code didn’t work — check it or request a new one.';render()}},
   auback:()=>{AU.step='email';AU.err='';render()},
   signout:async()=>{if(!confirmReplace())return;if(STORE)STORE.close();if(rtChannel)sb.removeChannel(rtChannel);await signOut();STORE=null;S.uid=null;S.docs={};Object.assign(TG,{invites:[],session:null,members:{}});Object.assign(SOC,{loaded:false,people:{},friends:[],feed:[],convs:[],challenges:[],thread:null});location.hash='#diary';render()},
-  delacct:async()=>{if(!confirmReplace())return;const {error}=await sb.rpc('delete_my_account');if(error){toast('Couldn’t delete: '+error.message);return}try{localStorage.removeItem('tally.cache.'+S.uid);localStorage.removeItem('tally.pending.'+S.uid)}catch(e){}if(STORE)STORE.close();await signOut().catch(()=>{});S.uid=null;S.docs={};toast('Your account was deleted');render()},
+  delacct:async()=>{if(!confirmReplace())return;await ciDeleteAllPhotos();const {error}=await sb.rpc('delete_my_account');if(error){toast('Couldn’t delete: '+error.message);return}try{localStorage.removeItem('tally.cache.'+S.uid);localStorage.removeItem('tally.pending.'+S.uid)}catch(e){}if(STORE)STORE.close();await signOut().catch(()=>{});S.uid=null;S.docs={};toast('Your account was deleted');render()},
   importopen:()=>openModal({kind:'import'}),
   importrun:()=>{let d;try{d=JSON.parse($('#imp-json').value)}catch(e){toast('That isn’t valid JSON');return}let n=0;for(const [k,v] of Object.entries(d||{}))if(/^[A-Za-z0-9_.:-]{1,64}$/.test(k)&&v&&typeof v==='object'){put(k,v);n++}closeModal();toast(`Imported ${n} item${n===1?'':'s'}`)},
   nativescan:async()=>{const m=M;try{const raw=await nativeScan();if(M!==m)return;const c=normCode(raw);if(c)gotCode(c);else if(raw)toast('That barcode type isn’t supported');}catch(err){if(M!==m)return;M.scan={stage:'start',err:err.code==='installing'?err.message:'Camera scan didn’t work — try a photo instead.'};drawModal(false)}},
@@ -1601,6 +1601,111 @@ const TACT={
     const p=get('posted')||{};p['rt'+m.id]=1;put('posted',p);toast(`Saved “${r.name}” to your routines`);renderThreadMsgs()},
 };
 
+/* ---------- weekly check-in ---------- */
+// Record per check-in (doc 'checkins'): {id,date,avg,n,bmi,meas:{waist,hips,chest,biceps,thighs} (cm),photos:{front,right,left,back} (private storage paths),ai:{text,vs,at}}
+const CI_MEAS=[['waist','Waist'],['hips','Hips'],['chest','Chest'],['biceps','Biceps'],['thighs','Thighs']];
+const CI_POSES=[['front','Front'],['right','Right side'],['left','Left side'],['back','Back']];
+const CI_BUCKET='checkins';
+const lU=()=>imperial()?'in':'cm',lOut=cm=>cm==null?null:(imperial()?cm/2.54:cm),lIn=v=>imperial()?v*2.54:v;
+const r1=x=>Math.round(x*10)/10;
+function checkins(){return (((get('checkins')||{}).list)||[]).slice().sort((a,b)=>a.date<b.date?1:-1)}
+function saveCheckin(rec){const doc=get('checkins')||{list:[]};doc.list=(doc.list||[]).filter(x=>x.id!==rec.id).concat([rec]);put('checkins',doc)}
+function ciWeek(date){const w=weights(),from=addDays(date,-6);const vals=Object.keys(w).filter(d=>d>=from&&d<=date).map(d=>w[d]);
+  return {avg:vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null,n:vals.length}}
+function ciBmi(kg){const h=(profile().height||0)/100;return kg&&h?kg/(h*h):null}
+function ciCurrent(){const date=S.ciDate||today();return checkins().find(c=>c.date===date)||null}
+function ciPrev(date){return checkins().find(c=>c.date<date)||null}
+function ciEnsure(){const date=S.ciDate||today();let c=ciCurrent();if(!c){c={id:'ci'+newId(),date,meas:{},photos:{}}}return c}
+function ciRefreshStats(c){const wk=ciWeek(c.date);c.avg=wk.avg!=null?r2(wk.avg):null;c.n=wk.n;const kg=c.avg!=null?c.avg:latestWeight(c.date);c.bmi=ciBmi(kg)!=null?r1(ciBmi(kg)):null;return c}
+const ciDelta=(now,prev,fmt,unit)=>{if(now==null||prev==null)return '';const d=now-prev;if(Math.abs(d)<0.05)return `<span class="cid">no change</span>`;return `<span class="cid ${d<0?'dn':'up'}">${d>0?'+':'−'}${fmt(Math.abs(d))}${unit?' '+unit:''}</span>`};
+/* private photo storage */
+const CIURL={};
+async function ciHydrate(){const imgs=[...document.querySelectorAll('img[data-path]')];if(!imgs.length)return;
+  const need=[...new Set(imgs.map(i=>i.dataset.path))].filter(p=>!CIURL[p]||CIURL[p].exp<Date.now());
+  if(need.length){try{const {data}=await sb.storage.from(CI_BUCKET).createSignedUrls(need,3600);(data||[]).forEach(d=>{if(d.signedUrl)CIURL[d.path]={url:d.signedUrl,exp:Date.now()+3300e3}})}catch(e){}}
+  for(const i of document.querySelectorAll('img[data-path]')){const u=CIURL[i.dataset.path];if(u&&i.src!==u.url)i.src=u.url}}
+async function shrinkPhoto(file,max){const bmp=await createImageBitmap(file,{imageOrientation:'from-image'}).catch(()=>null);
+  const src=bmp||await new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=URL.createObjectURL(file)});
+  const w=src.width,h=src.height,k=Math.min(1,max/Math.max(w,h));const c=document.createElement('canvas');c.width=Math.round(w*k);c.height=Math.round(h*k);
+  c.getContext('2d').drawImage(src,0,0,c.width,c.height);return new Promise(r=>c.toBlob(r,'image/jpeg',.82))}
+async function ciUpload(pose,file){const c=ciEnsure();S.ciBusy=pose;render();
+  try{const blob=await shrinkPhoto(file,1600);const path=`${S.uid}/${c.date}-${pose}-${newId()}.jpg`;
+    const {error}=await sb.storage.from(CI_BUCKET).upload(path,blob,{contentType:'image/jpeg',upsert:false});
+    if(error)throw error;const old=c.photos[pose];c.photos[pose]=path;CIURL[path]={url:URL.createObjectURL(blob),exp:Date.now()+3300e3};
+    ciRefreshStats(c);saveCheckin(c);if(old)sb.storage.from(CI_BUCKET).remove([old]);
+  }catch(e){toast('Photo not saved: '+(e.message||e)+(/bucket|not found/i.test(e.message||'')?' — run the check-in SQL in Supabase':''))}
+  S.ciBusy=null;render()}
+async function ciLoadBlob(path){const {data,error}=await sb.storage.from(CI_BUCKET).download(path);if(error)throw error;return data}
+// The AI gets two images: last check-in's four poses side by side, and this one's.
+async function ciComposite(c,label){const H=560,pad=8,top=34;const ims=[];
+  for(const [k,l] of CI_POSES){if(!c.photos[k])continue;const b=await ciLoadBlob(c.photos[k]);ims.push([l,await createImageBitmap(b)])}
+  const ws=ims.map(([,im])=>Math.round(im.width*H/im.height));const W=ws.reduce((a,b)=>a+b+pad,pad);
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H+top+pad;const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,W,cv.height);
+  g.fillStyle='#111';g.font='bold 20px sans-serif';let x=pad;ims.forEach(([l,im],i)=>{g.fillText(`${label} — ${l}`,x+4,24);g.drawImage(im,x,top,ws[i],H);x+=ws[i]+pad});
+  return new Promise(r=>cv.toBlob(r,'image/jpeg',.85))}
+async function ciCompare(){const c=ciCurrent(),p=c&&ciPrev(c.date);if(!c||!p||!S.sample)return;S.ciAi='busy';render();
+  try{const [a,b]=[await ciComposite(p,'Previous'),await ciComposite(c,'This week')];
+    const m=CI_MEAS.map(([k,l])=>c.meas[k]!=null&&p.meas&&p.meas[k]!=null?`${l} ${r1(lOut(p.meas[k]))} → ${r1(lOut(c.meas[k]))} ${lU()}`:null).filter(Boolean);
+    const days=Math.round((new Date(c.date)-new Date(p.date))/864e5);
+    const prompt=`You are a supportive, knowledgeable fitness coach reviewing a client's weekly progress photos for them.
+Image 1 is the previous check-in (${p.date}); image 2 is this check-in (${c.date}), ${days} days later. Each image shows the same poses side by side, labelled.
+${c.avg!=null&&p.avg!=null?`Average weight over the week: ${r1(wOut(p.avg))} → ${r1(wOut(c.avg))} ${wU()}.`:''}${m.length?' Measurements: '+m.join('; ')+'.':''}
+Compare the photos and describe what has visibly changed, area by area (for example shoulders, arms, chest, waist and midsection, hips, legs, back, posture). Be specific about where you see change and say plainly where you can't see a difference — a week is short and small changes are normal.
+Note briefly if differences in lighting, pose, distance, time of day or clothing make a fair comparison harder, with one practical tip for more consistent photos.
+Tone: encouraging, honest and neutral. Talk about progress, not appearance — no comments on attractiveness, no body-fat percentage guesses, no diet or weight-loss targets, no medical claims.
+Write 120–200 words in plain text: one short summary sentence, then 3–5 short lines starting with "• ", then one encouraging closing line.`;
+    const r=await S.sample(prompt,{images:[a,b]});c.ai={text:r.text.trim(),vs:p.id,vsDate:p.date,at:new Date().toISOString()};saveCheckin(c);S.ciAi=null;
+  }catch(e){console.warn('ciCompare',e);S.ciAi='err:'+(typeof aiErrMsg==='function'?aiErrMsg(e):(e.message||e))}
+  render()}
+function vCheckin(){
+  const date=S.ciDate||today(),c=ciCurrent()||ciRefreshStats({date,meas:{},photos:{}}),prev=ciPrev(date),wk=ciWeek(date);
+  const avg=wk.avg,bmi=ciBmi(avg!=null?avg:latestWeight(date)),pv=prev||{meas:{},photos:{}};
+  const fw=x=>r1(wOut(x)).toFixed(1),fl=x=>r1(lOut(x)).toFixed(1);
+  let h=`<div class="datebar"><h2>Weekly check-in</h2><input type="date" id="ci-date" class="inp" value="${date}" max="${today()}" aria-label="Check-in date"></div><div class="grid"><div class="stack">`;
+  h+=`<div class="tiles" style="grid-template-columns:1fr 1fr"><div class="tile"><div class="l">7-day average weight</div><div class="v">${avg!=null?fw(avg):'—'}<span class="faint" style="font-size:14px"> ${wU()}</span></div><div class="s">${avg!=null?`${wk.n} weigh-in${wk.n===1?'':'s'} · ${esc(nice(addDays(date,-6),{month:'short',day:'numeric'}))}–${esc(nice(date,{month:'short',day:'numeric'}))}`:'Log your weight on the Diary to fill this in'} ${prev?ciDelta(avg,prev.avg,fw,wU()):''}</div></div>
+    <div class="tile"><div class="l">BMI</div><div class="v">${bmi!=null?r1(bmi).toFixed(1):'—'}</div><div class="s">${bmi!=null?`from your height in Settings ${prev?ciDelta(bmi,prev.bmi,x=>x.toFixed(1)):''}`:'Add your height in Settings'}</div></div></div>`;
+  h+=`<section class="card"><div class="spread"><h3 style="font-size:18px">Measurements</h3><span class="faint">${lU()}${prev?` · last: ${esc(nice(prev.date,{month:'short',day:'numeric'}))}`:''}</span></div><div class="cim">${CI_MEAS.map(([k,l])=>{const v=c.meas[k],pvv=pv.meas&&pv.meas[k];
+    return `<label class="field">${l}<input class="inp ci-m" data-k="${k}" inputmode="decimal" value="${v!=null?fl(v):''}" placeholder="${pvv!=null?fl(pvv):''}">${ciDelta(v,pvv,fl,lU())}</label>`}).join('')}</div>
+    <p class="faint" style="font-size:13px;margin:10px 0 0">Measure at the same time of day each week, relaxed, tape snug but not tight. Saves as you go.</p></section>`;
+  h+=`<section class="card"><div class="spread"><h3 style="font-size:18px">Progress photos</h3><span class="faint">🔒 only you can see these</span></div><div class="ciph">${CI_POSES.map(([k,l])=>{const pth=c.photos&&c.photos[k];
+    return `<div class="cislot"><button class="ciimg" data-act="ciphoto" data-p="${k}" aria-label="${pth?'Replace':'Add'} ${l} photo">${S.ciBusy===k?'<span class="spin"></span>':pth?`<img data-path="${esc(pth)}" alt="${l}">`:'<span class="ciplus">+</span>'}</button><div class="cil">${l}${pth?` <button class="x sm" data-act="ciphotodel" data-p="${k}" aria-label="Remove ${l} photo">×</button>`:''}</div></div>`}).join('')}</div>
+    <p class="faint" style="font-size:13px;margin:10px 0 0">Same spot, same light, same distance each week makes the comparison much fairer.</p><input type="file" id="ci-file" accept="image/*" hidden></section>`;
+  const both=prev&&CI_POSES.some(([k])=>c.photos&&c.photos[k])&&CI_POSES.some(([k])=>pv.photos&&pv.photos[k]);
+  h+=`</div><div class="stack"><section class="card"><h3 style="font-size:18px">Compare with last check-in</h3>`;
+  if(!prev)h+=`<p class="faint" style="margin:8px 0 0">After your second check-in you’ll see the photos side by side here, and can ask Claude what’s changed.</p>`;
+  else{const pose=S.ciPose||'front';
+    h+=`<div class="chips" style="margin-top:8px">${CI_POSES.map(([k,l])=>`<button class="chip ${pose===k?'on':''}" data-act="ciposesel" data-p="${k}">${l}</button>`).join('')}</div>
+    <div class="cicmp"><figure>${pv.photos&&pv.photos[pose]?`<img data-path="${esc(pv.photos[pose])}" alt="">`:'<div class="ciempty">No photo</div>'}<figcaption>${esc(nice(prev.date,{month:'short',day:'numeric'}))}</figcaption></figure><figure>${c.photos&&c.photos[pose]?`<img data-path="${esc(c.photos[pose])}" alt="">`:'<div class="ciempty">No photo</div>'}<figcaption>${esc(nice(date,{month:'short',day:'numeric'}))}</figcaption></figure></div>`;
+    const ai=c.ai&&c.ai.vs===prev.id?c.ai:null;
+    if(ai)h+=`<div class="ciai"><div class="faint" style="font-size:12px;margin-bottom:4px">✨ Claude’s comparison · ${esc(nice(prev.date,{month:'short',day:'numeric'}))} → ${esc(nice(date,{month:'short',day:'numeric'}))}</div>${esc(ai.text)}</div>`;
+    if(S.ciAi&&S.ciAi.startsWith('err:'))h+=`<div class="notice warn" style="margin-top:10px">${esc(S.ciAi.slice(4))}</div>`;
+    h+=`<div class="row" style="margin-top:12px"><button class="btn ${ai?'':'primary'}" data-act="cicompare" ${!both||S.ciAi==='busy'||!S.sample?'disabled':''}>${S.ciAi==='busy'?'<span class="spin"></span> Comparing…':ai?'Compare again':'✨ Compare photos with Claude'}</button></div>
+    <p class="faint" style="font-size:12px;margin:8px 0 0">${both?'Sends these two check-ins’ photos to Claude only when you tap. Feedback is a rough guide, not medical advice.':'Add photos to both check-ins to compare.'}</p>`}
+  h+=`</section>`;
+  const list=checkins();
+  h+=`<section class="card"><h3 style="font-size:18px">History</h3>${list.length?`<div class="rlist">${list.map((x,i)=>{const nx=list[i+1];return `<button class="res cihist ${x.date===date?'on':''}" data-act="ciopen" data-d="${x.date}"><span class="t"><div class="nm">${esc(nice(x.date,{weekday:'short',month:'short',day:'numeric'}))}</div><div class="sub">${x.avg!=null?fw(x.avg)+' '+wU():'no weight'}${x.meas&&x.meas.waist!=null?` · waist ${fl(x.meas.waist)} ${lU()}`:''}${Object.keys(x.photos||{}).filter(k=>x.photos[k]).length?` · 📷 ${Object.keys(x.photos).filter(k=>x.photos[k]).length}`:''}${x.ai?' · ✨':''}</div></span>${nx?ciDelta(x.avg,nx.avg,fw,wU()):''}</button>`}).join('')}</div>`:'<p class="faint" style="margin:8px 0 0">Your check-ins will be listed here. Add a measurement or photo to save this one.</p>'}
+  ${ciCurrent()?`<div class="row" style="margin-top:12px"><button class="btn ghost sm" data-act="cidel">Delete this check-in</button></div>`:''}</section></div></div>`;
+  setTimeout(ciHydrate,0);
+  return h;
+}
+const CACT={
+  ciphoto:el=>{S.ciPick=el.dataset.p;const f=$('#ci-file');if(f){f.value='';f.click()}},
+  ciphotodel:el=>{const c=ciCurrent();if(!c)return;const pth=c.photos[el.dataset.p];delete c.photos[el.dataset.p];if(c.ai)delete c.ai;saveCheckin(c);if(pth)sb.storage.from(CI_BUCKET).remove([pth]);render()},
+  ciposesel:el=>{S.ciPose=el.dataset.p;render()},
+  cicompare:()=>ciCompare(),
+  ciopen:el=>{S.ciDate=el.dataset.d;S.ciAi=null;render();window.scrollTo(0,0)},
+  cidel:async()=>{if(!confirmReplace())return;const c=ciCurrent();if(!c)return;const paths=Object.values(c.photos||{}).filter(Boolean);
+    const doc=get('checkins')||{list:[]};doc.list=(doc.list||[]).filter(x=>x.id!==c.id);put('checkins',doc);if(paths.length)sb.storage.from(CI_BUCKET).remove(paths);toast('Check-in deleted');render()},
+};
+document.addEventListener('change',e=>{const t=e.target;
+  if(t.id==='ci-file'&&t.files&&t.files[0]&&S.ciPick){ciUpload(S.ciPick,t.files[0]);return}
+  if(t.id==='ci-date'){S.ciDate=t.value>today()?today():t.value;S.ciAi=null;render();return}
+  if(t.classList&&t.classList.contains('ci-m')){const c=ciEnsure(),v=parseFloat(String(t.value).replace(',','.'));
+    if(isNaN(v)||v<=0)delete c.meas[t.dataset.k];else c.meas[t.dataset.k]=r2(lIn(v));ciRefreshStats(c);saveCheckin(c);t.blur();render()}
+});
+// Remove the person's photos too when they delete their account
+async function ciDeleteAllPhotos(){try{const {data}=await sb.storage.from(CI_BUCKET).list(S.uid,{limit:1000});if(data&&data.length)await sb.storage.from(CI_BUCKET).remove(data.map(f=>`${S.uid}/${f.name}`))}catch(e){}}
+
 const ACT={
   day:el=>{S.date=addDays(S.date,+el.dataset.n);render()},
   today:()=>{S.date=today();render()},
@@ -1643,7 +1748,7 @@ const ACT={
   delcustom:el=>{const doc=get('custom')||{foods:[]};doc.foods=doc.foods.filter(f=>f.id!==el.dataset.id);put('custom',doc);toast('Food deleted')},
   export:async()=>{const txt=JSON.stringify(S.docs,null,1);try{await navigator.clipboard.writeText(txt);toast('Copied your data to the clipboard')}catch(e){toast('Copy was blocked by the browser')}}
 };
-Object.assign(ACT,WACT,SACT,AACT,HACT,MACT,VACT,FACT,TACT);
+Object.assign(ACT,WACT,SACT,AACT,HACT,MACT,VACT,FACT,TACT,CACT);
 document.addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');
   if(!el){if(e.target.id==='modal')closeModal();return}
@@ -1691,7 +1796,7 @@ document.addEventListener('keydown',e=>{
     else if(id==='ai-in'&&(e.metaKey||e.ctrlKey))aiRun();
   }
 });
-function route(){const h=location.hash.slice(1);S.view=['diary','workouts','social','trends','foods','profile'].includes(h)?h:'diary';closeModal();render();window.scrollTo(0,0)}
+function route(){const h=location.hash.slice(1);S.view=['diary','workouts','social','trends','foods','profile','checkin'].includes(h)?h:'diary';closeModal();render();window.scrollTo(0,0)}
 window.addEventListener('hashchange',()=>{if(S.uid)route()});
 boot();
 setTimeout(loadDB,600);

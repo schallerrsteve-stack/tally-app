@@ -328,3 +328,23 @@ body:has(#fab) main{padding-bottom:110px}
 .floatadd{position:sticky;bottom:14px;z-index:2;justify-content:flex-end;margin-top:14px;pointer-events:none}
 .floatadd .btn{pointer-events:auto;border-radius:999px;box-shadow:0 6px 20px rgba(0,0,0,.28)}
 .floatadd .btn.primary{padding:13px 24px;font-size:16px}
+/* settings cog, top right */
+.cog{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;color:var(--ink2);text-decoration:none;flex:none}
+.cog:hover{background:var(--soft)}.cog.on{background:var(--ink);color:var(--bg)}
+@media (max-width:700px){.brand{order:0}.cog{order:1;margin-left:auto;width:38px;height:38px}nav{order:2}}
+/* weekly check-in */
+.cim{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px 12px;margin-top:10px}
+.cid{display:inline-block;font-size:12px;font-weight:600;padding:1px 7px;border-radius:999px;background:var(--soft);color:var(--ink2);margin-left:4px}
+.cid.dn{color:var(--accent)}.cid.up{color:var(--c)}
+.ciph{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px}
+@media (max-width:520px){.ciph{grid-template-columns:repeat(2,1fr)}}
+.ciimg{display:grid;place-items:center;width:100%;aspect-ratio:3/4;border-radius:12px;border:1.5px dashed var(--line);background:var(--soft);overflow:hidden;padding:0;cursor:pointer}
+.ciimg img{width:100%;height:100%;object-fit:cover}.ciplus{font-size:30px;color:var(--ink2)}
+.cil{display:flex;align-items:center;justify-content:center;gap:4px;font-size:13px;margin-top:4px;color:var(--ink2)}
+.x.sm{width:22px;height:22px;font-size:14px}
+.cicmp{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.cicmp figure{margin:0}.cicmp img,.ciempty{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:12px;background:var(--soft)}
+.ciempty{display:grid;place-items:center;color:var(--ink2);font-size:13px}
+.cicmp figcaption{text-align:center;font-size:13px;color:var(--ink2);margin-top:4px}
+.ciai{margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--accent-soft);white-space:pre-wrap;font-size:14.5px;line-height:1.5}
+.cihist.on{background:var(--soft)}
