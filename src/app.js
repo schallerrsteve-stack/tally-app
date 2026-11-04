@@ -405,7 +405,7 @@ function detailBody(){
   </div>
   <div class="prev" id="prev">${preview()}</div>
   ${f.src==='Open Food Facts'?`<p class="faint" style="margin:10px 0 0">Nutrition from <a href="https://world.openfoodfacts.org/product/${esc(f.code)}" target="_blank" rel="noopener">Open Food Facts</a>, a crowd-sourced database${f.serving?` · serving on package: ${esc(f.serving)}`:''}. Doesn’t match the package? <button class="btn ghost sm" data-act="fixoff">Save a corrected version</button></p>`:''}
-  <div class="row" style="margin-top:14px;justify-content:flex-end">${M.editId?'<button class="btn" data-act="delfood" data-id="'+M.editId+'">Remove</button>':''}<button class="btn primary" data-act="savefood">${M.editId?'Save changes':'Add to diary'}</button></div></div>`;
+  <div class="row floatadd">${M.editId?'<button class="btn" data-act="delfood" data-id="'+M.editId+'">Remove</button>':''}<button class="btn primary" data-act="savefood">${M.editId?'Save changes':'Add to diary'}</button></div></div>`;
 }
 function curGrams(){const q=parseFloat(($('#qty')||{}).value);const pi=+(($('#por')||{}).value||M.pi);M.qty=isNaN(q)?0:q;M.pi=pi;return M.qty*M.sel.portions[pi][1]}
 function preview(){

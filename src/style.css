@@ -324,3 +324,7 @@ body:has(#fab) main{padding-bottom:110px}
 .bub.rcard{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:200px;background:var(--card);border:1px solid var(--line);color:var(--ink)}
 .msg.me .bub.rcard{background:var(--card);color:var(--ink)}
 .rc-t{font-weight:650}.rc-s{font-size:13px;color:var(--ink2)}.bub.rcard .btn{margin-top:4px}
+/* food details: Add to diary floats at the bottom of the screen while you scroll */
+.floatadd{position:sticky;bottom:14px;z-index:2;justify-content:flex-end;margin-top:14px;pointer-events:none}
+.floatadd .btn{pointer-events:auto;border-radius:999px;box-shadow:0 6px 20px rgba(0,0,0,.28)}
+.floatadd .btn.primary{padding:13px 24px;font-size:16px}
