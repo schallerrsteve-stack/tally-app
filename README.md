@@ -86,6 +86,10 @@ Exercise library + Claude routine builder test:
 ```
 node tests/exercises.e2e.cjs [photo.jpg]
 ```
+Recipes test (fake Supabase, Open Food Facts and Claude):
+```
+node tests/recipes.e2e.cjs
+```
 The exercise library (`public/data/exercises.json`) is built from [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain) with `python3 scripts/build-exercises.py exercises.json`; exercise photos load from that repository.
 
 Check-in photos need the private `checkins` storage bucket: run `supabase/migrations/20261104000000_checkin_photos.sql` once in the SQL editor.

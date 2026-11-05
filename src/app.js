@@ -259,10 +259,14 @@ document.addEventListener('pointerleave',()=>{$('#tip').hidden=true});
 
 /* ---------- my foods ---------- */
 function vFoods(){
-  const cs=customs();
-  return `<div class="datebar"><h2>My foods</h2><span class="row"><button class="btn" data-act="newscan">Scan a barcode</button><button class="btn primary" data-act="newcustom">+ Create food</button></span></div>
-  <section class="card" style="padding:0">${cs.length?cs.map(f=>`<div class="entry"><div class="main" style="cursor:default"><span class="t"><div class="nm">${esc(f.name)}${(f.codes||[]).length?` <span class="tag">▮▯▮ ${esc(prettyCode(f.codes[0]))}</span>`:''}</div><div class="sub">${esc(f.portions[0][0])} (${Math.round(f.portions[0][1])} g) · ${Math.round(f.per.kcal*f.portions[0][1]/100)} kcal · P ${fmt(f.per.p*f.portions[0][1]/100,'p')} · C ${fmt(f.per.c*f.portions[0][1]/100,'c')} · F ${fmt(f.per.f*f.portions[0][1]/100,'f')}</div></span></div><button class="x" data-act="delcustom" data-id="${f.id}" aria-label="Delete ${esc(f.name)}">×</button></div>`).join(''):`<div class="empty" style="border:0;padding:22px">No custom foods yet. Create one from a nutrition label, or save a recipe you eat often.</div>`}</section>
-  <p class="faint" style="margin-top:14px">Search covers Health Canada’s Canadian Nutrient File (5,690 foods, with Canadian fortification levels and French names) and the USDA National Nutrient Database (about 8,800 foods), with 19 nutrients each. Barcodes are looked up live on <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL) and kept on your phone; products it doesn’t have, or that you correct, are saved here. For anything else, use <b>Describe it</b> in the add-food window to have Claude estimate the nutrition, or create your own food here.</p>`;
+  const all=customs(),rs=all.filter(f=>f.recipe),cs=all.filter(f=>!f.recipe);
+  const sub=f=>`${esc(f.portions[0][0])} (${Math.round(f.portions[0][1])} g) · ${Math.round(f.per.kcal*f.portions[0][1]/100)} kcal · P ${fmt(f.per.p*f.portions[0][1]/100,'p')} · C ${fmt(f.per.c*f.portions[0][1]/100,'c')} · F ${fmt(f.per.f*f.portions[0][1]/100,'f')}`;
+  return `<div class="datebar"><h2>My foods</h2></div>
+  <section class="card"><div class="spread"><h3 style="font-size:18px">My recipes</h3><button class="btn primary sm" data-act="newrecipe">+ New recipe</button></div>
+  ${rs.length?`<div class="rlist">${rs.map(f=>`<div class="rrow"><button class="res" data-act="editrecipe" data-id="${f.id}" style="flex:1;min-width:0"><span class="t"><div class="nm">🍲 ${esc(f.name)}</div><div class="sub">${sub(f)} · makes ${f.recipe.servings}</div></span></button><button class="btn sm" data-act="logrecipe" data-id="${f.id}">+ Log</button></div>`).join('')}</div>`
+  :`<p class="faint" style="margin:8px 0 0">Build a dish from its ingredients — search them, scan their barcodes one after another, or scan a whole recipe card, page or screenshot. Tally works out the nutrition per serving, and the recipe shows up when you search for food.</p>`}</section>
+  <section class="card" style="padding:0;margin-top:18px"><div class="spread" style="padding:14px 18px 6px"><h3 style="font-size:18px">My foods</h3><span class="row"><button class="btn sm" data-act="newscan">Scan a barcode</button><button class="btn sm" data-act="newcustom">+ Create food</button></span></div>${cs.length?cs.map(f=>`<div class="entry"><div class="main" style="cursor:default"><span class="t"><div class="nm">${esc(f.name)}${(f.codes||[]).length?` <span class="tag">▮▯▮ ${esc(prettyCode(f.codes[0]))}</span>`:''}</div><div class="sub">${sub(f)}</div></span></div><button class="x" data-act="delcustom" data-id="${f.id}" aria-label="Delete ${esc(f.name)}">×</button></div>`).join(''):`<div class="empty" style="border:0;padding:22px">No custom foods yet. Create one from a nutrition label, or scan a product Tally doesn’t know.</div>`}</section>
+  <p class="faint" style="margin-top:14px">Search covers Health Canada’s Canadian Nutrient File (5,690 foods, with Canadian fortification levels and French names) and the USDA National Nutrient Database (about 8,800 foods), with 19 nutrients each. Barcodes are looked up live on <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL) and kept on your phone. For anything else, use <b>Describe it</b> in the add-food window to have Claude estimate the nutrition, or create your own food here.</p>`;
 }
 
 /* ---------- profile ---------- */
@@ -323,18 +327,21 @@ function saveProfile(){
 /* ---------- modal ---------- */
 let M=null;
 function openModal(st){M=st;S.fabOpen=false;updateFab();$('#modal').hidden=false;drawModal();document.body.style.overflow='hidden'}
-function closeModal(){M=null;$('#modal').hidden=true;$('#modal').innerHTML='';updateFab();document.body.style.overflow=''}
+function closeModal(force){if(force!==true&&M&&M.forRecipe){openModal({kind:'recipe'});return}
+  if(force!==true&&M&&M.kind==='recipe'&&S.rcp&&S.rcp.items.length&&!M.rscan){rcpReadInputs();if(!confirmReplace())return;S.rcp=null}
+  if(force!==true&&M&&M.kind==='recipe'&&M.rscan){M.rscan=null;drawModal(false);return}
+  M=null;$('#modal').hidden=true;$('#modal').innerHTML='';updateFab();document.body.style.overflow=''}
 function drawModal(focus){
   if(!M)return;
-  $('#modal').innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="${M.kind==='ex'?'Add exercise':M.kind==='routine'?'Routine':M.kind==='pick'?'Pick exercise':M.kind==='summary'?'Workout summary':'Add food'}">${M.kind==='ex'?exBody():M.kind==='weight'?weightBody():M.kind==='round'?roundBody():M.kind==='routine'?routineBody():M.kind==='pick'?pickerBody():M.kind==='summary'?summaryBody():M.kind==='newchat'?newChatBody():M.kind==='together'?togetherBody():M.kind==='howto'?howtoBody(false):M.kind==='build'?buildBody():M.kind==='newchal'?newChalBody():M.kind==='import'?importBody():foodBody()}</div>`;
+  $('#modal').innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="${M.kind==='ex'?'Add exercise':M.kind==='routine'?'Routine':M.kind==='pick'?'Pick exercise':M.kind==='summary'?'Workout summary':'Add food'}">${M.kind==='ex'?exBody():M.kind==='weight'?weightBody():M.kind==='round'?roundBody():M.kind==='routine'?routineBody():M.kind==='pick'?pickerBody():M.kind==='summary'?summaryBody():M.kind==='newchat'?newChatBody():M.kind==='together'?togetherBody():M.kind==='howto'?howtoBody(false):M.kind==='recipe'?recipeBody():M.kind==='build'?buildBody():M.kind==='newchal'?newChalBody():M.kind==='import'?importBody():foodBody()}</div>`;
   const f=$('#modal [autofocus]');if(f&&focus!==false)f.focus();
 }
 const mealName=k=>(MEALS.find(m=>m[0]===k)||MEALS[3])[1];
 const mealSel=v=>`<select id="meal" class="inp">${MEALS.map(([k,l])=>`<option value="${k}" ${k===v?'selected':''}>${l}</option>`).join('')}</select>`;
 function foodBody(){
   if(M.sel)return detailBody();
-  const tabs=[['search','Search'],['scan','Scan barcode'],['ai','Describe it'],['custom','Create food'],['quick','Quick add']].filter(t=>!(M.fromFoods&&t[0]!=='custom'));
-  let h=`<div class="sheet-h"><h3>${M.fromFoods?'Create a food':M.editId?'Edit entry':'Add to '+mealName(M.meal)}</h3><button class="x" data-act="close" aria-label="Close">×</button></div>`;
+  const tabs=[['search','Search'],['scan','Scan barcode'],['ai','Describe it'],['custom','Create food'],['quick','Quick add']].filter(t=>!(M.fromFoods&&t[0]!=='custom')&&!(M.forRecipe&&t[0]==='quick'));
+  let h=`<div class="sheet-h"><h3>${M.forRecipe?'Add an ingredient':M.fromFoods?'Create a food':M.editId?'Edit entry':'Add to '+mealName(M.meal)}</h3><button class="x" data-act="close" aria-label="Close">×</button></div>`;
   if(tabs.length>1)h+=`<div class="tabs" role="tablist">${tabs.map(([k,l])=>`<button role="tab" class="${M.tab===k?'on':''}" data-act="tab" data-tab="${k}" aria-selected="${M.tab===k}">${l}</button>`).join('')}</div>`;
   h+=`<div class="sheet-b">`;
   if(M.tab==='search')h+=`<input id="fq" class="inp" placeholder="Search foods — e.g. banana, greek yogurt, salmon" value="${esc(M.q||'')}" autofocus autocomplete="off"><div class="results" id="fres">${results()}</div>`;
@@ -401,11 +408,11 @@ function detailBody(){
   <div class="sheet-b"><div class="fgrid">
     <label class="field">Amount<input id="qty" type="number" min="0" step="any" inputmode="decimal" value="${M.qty}" autofocus></label>
     <label class="field">Serving<select id="por" class="inp">${f.portions.map((p,i)=>`<option value="${i}" ${i===M.pi?'selected':''}>${esc(p[0])}${p[0]!=='g'?` (${Math.round(p[1]*10)/10} g)`:''}</option>`).join('')}</select></label>
-    <label class="field">Meal${mealSel(M.meal)}</label>
+    ${M.forRecipe?'':`<label class="field">Meal${mealSel(M.meal)}</label>`}
   </div>
   <div class="prev" id="prev">${preview()}</div>
   ${f.src==='Open Food Facts'?`<p class="faint" style="margin:10px 0 0">Nutrition from <a href="https://world.openfoodfacts.org/product/${esc(f.code)}" target="_blank" rel="noopener">Open Food Facts</a>, a crowd-sourced database${f.serving?` · serving on package: ${esc(f.serving)}`:''}. Doesn’t match the package? <button class="btn ghost sm" data-act="fixoff">Save a corrected version</button></p>`:''}
-  <div class="row floatadd">${M.editId?'<button class="btn" data-act="delfood" data-id="'+M.editId+'">Remove</button>':''}<button class="btn primary" data-act="savefood">${M.editId?'Save changes':'Add to diary'}</button></div></div>`;
+  <div class="row floatadd">${M.editId?'<button class="btn" data-act="delfood" data-id="'+M.editId+'">Remove</button>':''}<button class="btn primary" data-act="savefood">${M.forRecipe?'Add to recipe':M.editId?'Save changes':'Add to diary'}</button></div></div>`;
 }
 function curGrams(){const q=parseFloat(($('#qty')||{}).value);const pi=+(($('#por')||{}).value||M.pi);M.qty=isNaN(q)?0:q;M.pi=pi;return M.qty*M.sel.portions[pi][1]}
 function preview(){
@@ -414,6 +421,7 @@ function preview(){
   <div class="ptable">${KEYS.filter(k=>k!=='kcal').map(k=>`<div><span>${META[k][0]}</span><span>${fmt(n[k],k)} ${META[k][1]}</span></div>`).join('')}</div>`;
 }
 function saveFood(){
+  if(M.forRecipe)return rcpTakeFood();
   const g=curGrams();if(!(g>0)){toast('Enter an amount');return}
   const f=M.sel,[unit,unitG]=f.portions[M.pi],meal=$('#meal').value;
   const e={id:M.editId||newId(),fid:f.id,name:f.name,meal,qty:M.qty,unit,unitG,g:r2(g),per:f.per,n:scale(f.per,g)};
@@ -431,7 +439,7 @@ function aiBody(){
     const tot=sumN(M.ai);
     h+=`<div class="results" style="max-height:none">${M.ai.map((it,i)=>`<div class="ai-item"><span style="flex:1;min-width:0"><div class="nm" style="font-weight:500">${esc(it.name)}</div><div class="faint">${esc(it.amount)} · ${Math.round(it.g)} g · P ${fmt(it.n.p,'p')} · C ${fmt(it.n.c,'c')} · F ${fmt(it.n.f,'f')}</div></span><b style="font-variant-numeric:tabular-nums">${Math.round(it.n.kcal)}</b><button class="x" data-act="airm" data-i="${i}" aria-label="Remove ${esc(it.name)}">×</button></div>`).join('')}</div>
     <div class="spread" style="margin-top:12px"><span class="muted">Total <b>${Math.round(tot.kcal)} kcal</b> · P ${Math.round(tot.p)} g · C ${Math.round(tot.c)} g · F ${Math.round(tot.f)} g</span>
-    <span class="row">${mealSel(M.meal)}<button class="btn primary" data-act="aiadd">Add ${M.ai.length} item${M.ai.length>1?'s':''}</button></span></div>
+    <span class="row">${M.forRecipe?'':mealSel(M.meal)}<button class="btn primary" data-act="aiadd">${M.forRecipe?'Add to recipe':'Add '+M.ai.length+' item'+(M.ai.length>1?'s':'')}</button></span></div>
     <p class="faint" style="margin-top:8px">Estimates can be off — tap any entry in your diary afterward to adjust the amount.</p>`;
   }
   return h;
@@ -460,6 +468,7 @@ Meal description: """${txt.slice(0,1500)}"""`;
   M.aiBusy=false;drawModal(false);
 }
 function aiAdd(){
+  if(M.forRecipe)return rcpTakeAi();
   const meal=$('#meal').value,d=day(S.date);
   for(const it of M.ai){const per=it.g>0?Object.fromEntries(KEYS.map(k=>[k,r2(it.n[k]*100/it.g)])):null;
     d.foods.push(per?{id:newId(),fid:null,name:it.name,meal,qty:1,unit:it.amount,unitG:r2(it.g),g:r2(it.g),per,n:it.n,src:'ai'}:{id:newId(),name:it.name,meal,amount:it.amount,n:it.n,src:'ai'})}
@@ -492,7 +501,7 @@ function saveCustom(){
   if(M.code)f.codes=[M.code];
   const doc=get('custom')||{foods:[]};doc.foods=(doc.foods||[]).concat([f]);
   if(M.fromFoods){closeModal();put('custom',doc);toast('Food saved');return}
-  const meal=M.meal;put('custom',doc);M={kind:'food',meal,sel:Object.assign({},f,{cat:'My foods'}),qty:1,pi:0};drawModal();
+  const meal=M.meal,fr=M.forRecipe,tab=M.tab;put('custom',doc);M={kind:'food',meal,sel:Object.assign({},f,{cat:'My foods'}),qty:1,pi:0,forRecipe:fr,tab};drawModal();
 }
 /* ---------- barcode scanning ---------- */
 const AIMAP={kcal:'kcal',p:'protein_g',c:'carbs_g',f:'fat_g',fib:'fiber_g',sug:'sugars_g',na:'sodium_mg',k:'potassium_mg',ca:'calcium_mg',fe:'iron_mg',vc:'vitamin_c_mg',sf:'saturated_fat_g',chol:'cholesterol_mg',mg:'magnesium_mg',zn:'zinc_mg',va:'vitamin_a_ug_rae',vd:'vitamin_d_ug',b12:'vitamin_b12_ug',fol:'folate_ug_dfe'};
@@ -1802,6 +1811,84 @@ document.addEventListener('change',e=>{const t=e.target;
   if((t.id==='pg'||t.id==='pe')&&M){M[t.id]=t.value;loadFx();const r=$('#pres');if(r)r.innerHTML=pickResults()}
 });
 
+/* ---------- my recipes ---------- */
+// A recipe is saved as a custom food with .recipe = {servings, cooked, items:[{id,name,amount,g,per (per 100 g) or null,n (totals)}]}.
+// Ingredients come from the normal add-food window in "recipe mode" (search, barcode scans one after another,
+// label photos, Create food, Describe it) or from a scanned/pasted recipe read by Claude.
+function recipes(){return customs().filter(f=>f.recipe)}
+function rcpNew(){return {id:null,name:'',servings:4,cooked:'',items:[]}}
+function rcpTotals(r){const t=sumN(r.items);const g=r.items.reduce((a,i)=>a+(+i.g||0),0);const W=+r.cooked>0?+r.cooked:g;const sv=Math.max(1,+r.servings||1);
+  const per=Object.fromEntries(KEYS.map(k=>[k,r2(t[k]/sv)]));return {t,g,W,sv,serving:per,servG:W>0?W/sv:0}}
+function rcpAddItem(it){S.rcp=S.rcp||rcpNew();S.rcp.items.push(Object.assign({id:newId()},it))}
+function recipeBody(){const r=S.rcp||(S.rcp=rcpNew());
+  if(M.rscan)return rscanBody();
+  const T=rcpTotals(r),mac=n=>`${Math.round(n.kcal)} kcal · P ${fmt(n.p,'p')} · C ${fmt(n.c,'c')} · F ${fmt(n.f,'f')}`;
+  return `<div class="sheet-h"><h3>${r.id?'Edit recipe':'New recipe'}</h3><button class="x" data-act="close" aria-label="Close">×</button></div><div class="sheet-b">
+  <div class="fgrid"><label class="field" style="grid-column:1/-1">Recipe name<input id="rc-name" class="inp" maxlength="80" value="${esc(r.name)}" placeholder="e.g. Turkey chili"></label>
+  <label class="field">Servings it makes<input id="rc-sv" class="inp" type="number" min="1" max="100" inputmode="numeric" value="${esc(r.servings)}"></label>
+  <label class="field">Cooked weight (g) <span class="faint">optional</span><input id="rc-cw" class="inp" type="number" min="0" inputmode="decimal" value="${esc(r.cooked||'')}" placeholder="${T.g?Math.round(T.g):''}"></label></div>
+  <h3 class="minih">Ingredients ${r.items.length?`<span class="faint">(${r.items.length})</span>`:''}</h3>
+  ${r.items.length?`<div class="rlist">${r.items.map((it,i)=>`<div class="rrow rcpi"><div class="t"><div class="nm">${esc(it.name)}</div><div class="sub">${it.amount?esc(it.amount)+' · ':''}${Math.round(it.n.kcal||0)} kcal${it.src==='ai'?' · ✨ estimate':it.src==='off'?' · ▮▯▮':''}</div></div>${it.per?`<label class="rcg"><input class="inp rc-g" data-i="${i}" inputmode="decimal" value="${Math.round(it.g*10)/10}" aria-label="Grams of ${esc(it.name)}"><span>g</span></label>`:''}<button class="x" data-act="rcprm" data-i="${i}" aria-label="Remove ${esc(it.name)}">×</button></div>`).join('')}</div>`:'<p class="faint" style="margin:6px 0">Add ingredients by searching, scanning their barcodes one after another, or scanning a whole recipe.</p>'}
+  <div class="row" style="margin-top:10px"><button class="btn" data-act="rcpadd" data-tab="search">🔍 Search</button><button class="btn" data-act="rcpadd" data-tab="scan">▮▯▮ Scan barcode</button>${S.sample?'<button class="btn" data-act="rcpscan">📷 Scan a recipe</button>':''}<button class="btn ghost" data-act="rcpadd" data-tab="custom">+ Create</button></div>
+  ${r.items.length?`<div class="rctot"><div><span class="faint">Per serving${T.servG?` (${Math.round(T.servG)} g)`:''}</span><b>${mac(T.serving)}</b></div><div><span class="faint">Whole recipe · ${T.sv} serving${T.sv>1?'s':''}</span><span>${mac(T.t)}</span></div></div>`:''}
+  <div class="row floatadd">${r.id?'<button class="btn" data-act="rcpdel">Delete</button>':''}<button class="btn primary" data-act="rcpsave">Save recipe</button></div></div>`}
+function rscanBody(){const s=M.rscan;
+  return `<div class="sheet-h"><button class="btn ghost sm" data-act="rcpscanback" style="white-space:nowrap">‹ Back</button><h3 style="margin-left:4px">Scan a recipe</h3><button class="x" data-act="close" aria-label="Close">×</button></div><div class="sheet-b">
+  <p class="faint" style="margin-top:0">Take a photo of a recipe card, cookbook page or screenshot — or paste the recipe. Claude lists each ingredient with its amount and estimates its nutrition; you can adjust anything after.</p>
+  <div class="row"><label class="btn ${s.photo?'':'primary'}">${s.photo?'📷 Change photo':'📷 Photo of the recipe'}<input type="file" id="rs-file" accept="image/*" hidden></label>${s.photo?`<span class="faint">${esc(s.photoName||'Photo added')} <button class="x sm" data-act="rsnophoto" aria-label="Remove photo">×</button></span>`:''}</div>
+  <label class="field" style="margin-top:12px">…or paste it<textarea id="rs-text" class="inp" rows="6" placeholder="Ingredients and amounts, e.g.&#10;1 lb lean ground turkey&#10;1 can (540 ml) kidney beans, drained&#10;2 tbsp olive oil" ${s.busy?'disabled':''}>${esc(s.text||'')}</textarea></label>
+  ${s.err?`<div class="notice warn" style="margin-top:10px">${esc(s.err)}</div>`:''}
+  <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn primary" data-act="rsrun" ${s.busy?'disabled':''}>${s.busy?'<span class="spin"></span> Reading the recipe…':'Read recipe'}</button></div></div>`}
+async function rsRun(){const s=M.rscan,ta=$('#rs-text');s.text=ta?ta.value.trim():s.text;
+  if(!s.text&&!s.photo){s.err='Add a photo or paste the recipe first.';drawModal(false);return}
+  s.busy=true;s.err='';drawModal(false);const m=M;
+  const prompt=`You are a precise nutrition database assistant. ${s.photo?'The attached photo shows a recipe. Read every ingredient line carefully.':''}
+List each ingredient of the recipe with its amount, and estimate its nutrition AS USED IN THE RECIPE (the full listed amount, raw/uncooked unless the recipe says otherwise), using typical USDA FoodData Central values. Skip water, and salt/pepper "to taste". If an amount is missing, assume a typical one and say so in "amount".
+Return ONLY a JSON object, no prose, in exactly this shape:
+{"name":"recipe title","servings":4,"items":[{"name":"Lean ground turkey","amount":"1 lb","grams":454,${KEYS.map(k=>'"'+AIMAP[k]+'":0').join(',')}}]}
+All nutrient numbers are totals for the stated amount (replace the 0 placeholders with real estimates; vitamin A is RAE, folate is DFE). "grams" is the weight of that amount. "servings" is how many servings the recipe says it makes (guess sensibly if not stated).
+${s.text?`Recipe text: """${s.text.slice(0,5000)}"""`:''}`;
+  try{const imgs=s.photo?[await shrinkPhoto(s.photo,1600)]:[];const r=await S.sample(prompt,{images:imgs});if(M!==m)return;
+    const j=parseJSON(r.text||'');const items=(j.items||[]).filter(it=>it&&it.name).slice(0,40);
+    if(!items.length)throw new Error('Claude couldn’t find any ingredients — try a clearer photo or paste the list.');
+    const R=S.rcp=S.rcp||rcpNew();if(!R.name&&j.name)R.name=String(j.name).slice(0,80);if(!R.items.length&&+j.servings>0)R.servings=Math.min(100,Math.round(+j.servings));
+    for(const it of items){const n={};KEYS.forEach(k=>n[k]=r2(Math.max(0,+it[AIMAP[k]]||0)));const g=Math.max(0,+it.grams||0);
+      rcpAddItem({name:String(it.name).slice(0,80),amount:String(it.amount||'').slice(0,60),g,per:g>0?Object.fromEntries(KEYS.map(k=>[k,r2(n[k]*100/g)])):null,n,src:'ai'})}
+    M.rscan=null;drawModal(false);toast(`Added ${items.length} ingredient${items.length>1?'s':''}`);
+  }catch(e){if(M!==m)return;s.busy=false;s.err=e.code?aiErrMsg(e):(e.message||'That didn’t work. Please try again.');drawModal(false)}}
+function rcpReadInputs(){const r=S.rcp;if(!r)return;const n=$('#rc-name'),sv=$('#rc-sv'),cw=$('#rc-cw');if(n)r.name=n.value;
+  if(sv){const v=parseInt(sv.value);r.servings=v>0?Math.min(100,v):r.servings}if(cw){const v=parseFloat(cw.value);r.cooked=v>0?v:''}}
+function rcpSave(){rcpReadInputs();const r=S.rcp;if(!r.name.trim()){toast('Give the recipe a name');return}if(!r.items.length){toast('Add at least one ingredient');return}
+  const T=rcpTotals(r);const servG=T.servG>0?T.servG:100;
+  const per=Object.fromEntries(KEYS.map(k=>[k,T.serving[k]==null?null:r2(T.serving[k]*100/servG)]));
+  const f={id:r.id||'rc'+newId(),name:r.name.trim().slice(0,80),per,portions:[['serving',r2(servG)],['g',1]],recipe:{servings:T.sv,cooked:r.cooked||'',items:r.items}};
+  const doc=get('custom')||{foods:[]};doc.foods=(doc.foods||[]).filter(x=>x.id!==f.id).concat([f]);put('custom',doc);
+  S.rcp=null;M=null;closeModal(true);toast('Recipe saved');render()}
+// The add-food window in recipe mode hands the chosen food back here
+function rcpTakeFood(){const g=curGrams();if(!(g>0)){toast('Enter an amount');return}const f=M.sel,[unit]=f.portions[M.pi];
+  rcpAddItem({name:f.name,amount:`${Math.round(M.qty*100)/100} ${unit}`,g:r2(g),per:f.per,n:scale(f.per,g),src:f.src==='Open Food Facts'?'off':'db',fid:f.id});
+  const scanned=M.tab==='scan';openModal({kind:'recipe'});toast(scanned?`Added ${f.name} — scan the next one`:`Added ${f.name}`)}
+function rcpTakeAi(){for(const it of M.ai)rcpAddItem({name:it.name,amount:it.amount,g:it.g,per:it.g>0?Object.fromEntries(KEYS.map(k=>[k,r2(it.n[k]*100/it.g)])):null,n:it.n,src:'ai'});
+  const c=M.ai.length;openModal({kind:'recipe'});toast(`Added ${c} ingredient${c>1?'s':''}`)}
+const RACT={
+  newrecipe:()=>{S.rcp=rcpNew();openModal({kind:'recipe'})},
+  editrecipe:el=>{const f=customs().find(x=>x.id===el.dataset.id);if(!f||!f.recipe)return;S.rcp={id:f.id,name:f.name,servings:f.recipe.servings,cooked:f.recipe.cooked||'',items:clone(f.recipe.items)};openModal({kind:'recipe'})},
+  logrecipe:el=>{const f=customs().find(x=>x.id===el.dataset.id);if(!f)return;openModal({kind:'food',meal:mealNow(),sel:Object.assign({},f,{cat:'My foods'}),qty:1,pi:0})},
+  rcpadd:el=>{rcpReadInputs();loadDB();openModal({kind:'food',tab:el.dataset.tab,meal:'s',forRecipe:true,q:''})},
+  rcpscan:()=>{rcpReadInputs();M.rscan={};drawModal(false)},
+  rcpscanback:()=>{M.rscan=null;drawModal(false)},
+  rsnophoto:()=>{const ta=$('#rs-text');if(ta)M.rscan.text=ta.value;M.rscan.photo=null;drawModal(false)},
+  rsrun:()=>rsRun(),
+  rcprm:el=>{rcpReadInputs();S.rcp.items.splice(+el.dataset.i,1);drawModal(false)},
+  rcpsave:()=>rcpSave(),
+  rcpdel:()=>{if(!confirmReplace())return;const id=S.rcp&&S.rcp.id;const doc=get('custom')||{foods:[]};doc.foods=(doc.foods||[]).filter(x=>x.id!==id);put('custom',doc);S.rcp=null;closeModal(true);toast('Recipe deleted');render()},
+};
+document.addEventListener('change',e=>{const t=e.target;
+  if(t.id==='rs-file'&&t.files&&t.files[0]&&M&&M.rscan){const ta=$('#rs-text');if(ta)M.rscan.text=ta.value;M.rscan.photo=t.files[0];M.rscan.photoName=t.files[0].name;M.rscan.err='';drawModal(false)}
+  if(t.classList&&t.classList.contains('rc-g')&&S.rcp){const it=S.rcp.items[+t.dataset.i],v=parseFloat(t.value);if(it&&it.per&&v>=0&&r2(v)!==it.g){it.g=r2(v);it.n=scale(it.per,v);it.amount=''}rcpReadInputs();setTimeout(()=>drawModal(false),0)}
+  if(['rc-sv','rc-cw'].includes(t.id)&&S.rcp){rcpReadInputs();setTimeout(()=>drawModal(false),0)}
+});
+
 const ACT={
   day:el=>{S.date=addDays(S.date,+el.dataset.n);render()},
   today:()=>{S.date=today();render()},
@@ -1844,7 +1931,7 @@ const ACT={
   delcustom:el=>{const doc=get('custom')||{foods:[]};doc.foods=doc.foods.filter(f=>f.id!==el.dataset.id);put('custom',doc);toast('Food deleted')},
   export:async()=>{const txt=JSON.stringify(S.docs,null,1);try{await navigator.clipboard.writeText(txt);toast('Copied your data to the clipboard')}catch(e){toast('Copy was blocked by the browser')}}
 };
-Object.assign(ACT,WACT,SACT,AACT,HACT,MACT,VACT,FACT,TACT,CACT,XACT);
+Object.assign(ACT,WACT,SACT,AACT,HACT,MACT,VACT,FACT,TACT,CACT,XACT,RACT);
 document.addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');
   if(!el){if(e.target.id==='modal')closeModal();return}
@@ -1892,7 +1979,7 @@ document.addEventListener('keydown',e=>{
     else if(id==='ai-in'&&(e.metaKey||e.ctrlKey))aiRun();
   }
 });
-function route(){const h=location.hash.slice(1);S.view=['diary','workouts','social','trends','foods','profile','checkin'].includes(h)?h:'diary';closeModal();render();window.scrollTo(0,0)}
+function route(){const h=location.hash.slice(1);S.view=['diary','workouts','social','trends','foods','profile','checkin'].includes(h)?h:'diary';closeModal(true);render();window.scrollTo(0,0)}
 window.addEventListener('hashchange',()=>{if(S.uid)route()});
 boot();
 setTimeout(loadDB,600);

@@ -356,3 +356,7 @@ body:has(#fab) main{padding-bottom:110px}
 .hximg img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px;background:var(--soft)}
 .hximg figcaption{text-align:center;font-size:12px;color:var(--ink2);margin-top:3px}
 .hxsteps{padding-left:20px;margin:8px 0;line-height:1.5}.hxsteps li{margin-bottom:6px}
+/* recipes */
+.rcpi .t{min-width:0}.rcg{display:flex;align-items:center;gap:4px;flex:none}.rcg .inp{width:74px;padding:6px 8px;text-align:right}.rcg span{font-size:13px;color:var(--ink2)}
+.rctot{display:grid;gap:6px;margin-top:14px;padding:12px 14px;border-radius:12px;background:var(--soft)}
+.rctot>div{display:flex;flex-direction:column;gap:2px}.rctot b{font-size:15px}
