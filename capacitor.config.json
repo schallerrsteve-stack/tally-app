@@ -2,6 +2,13 @@
   "appId": "ca.tallyfit.app",
   "appName": "Tally",
   "webDir": "dist",
-  "android": { "allowMixedContent": false },
-  "plugins": {}
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_tally",
+      "iconColor": "#2f6b45"
+    }
+  }
 }

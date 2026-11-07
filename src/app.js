@@ -106,6 +106,7 @@ function render(){
   if(S.ws)ensureTick();
   updateDock();
   updateFab();
+  if(S.uid&&remNative())remSyncSoon();
 }
 function bar(v,t,color){const pct=t?Math.min(100,v/t*100):0;return `<div class="track"><i style="width:${pct}%;background:${color}"></i></div>`}
 function vDiary(){
@@ -308,7 +309,7 @@ function vProfile(){
     </div>
     <p class="faint" style="margin-top:12px">Nutrient targets (fiber, potassium, calcium, iron, vitamin C) follow the US/Canadian Dietary Reference Intakes for your age and sex; sodium uses the 2,300 mg upper limit. These are general guidelines, not medical advice.</p>
   </section>
-  <h3 class="sech">Watch &amp; apps</h3>${hcCard()}${MC()?`<section class="card"><h3 style="font-size:18px">Music controls</h3><label class="chkrow"><input type="checkbox" id="mdock" ${dockOn()?'checked':''}> Show play/pause and skip buttons at the bottom of every screen (works with YouTube Music, Spotify and other music apps)</label></section>`:''}<h3 class="sech">Account</h3><section class="card"><h3 style="font-size:18px">Your account</h3><p class="muted" style="font-size:14px">Signed in as <b>${esc(S.email||'')}</b>. Your diary is private to you and syncs across your devices.</p>
+  <h3 class="sech">Reminders</h3>${remCard()}<h3 class="sech">Watch &amp; apps</h3>${hcCard()}${MC()?`<section class="card"><h3 style="font-size:18px">Music controls</h3><label class="chkrow"><input type="checkbox" id="mdock" ${dockOn()?'checked':''}> Show play/pause and skip buttons at the bottom of every screen (works with YouTube Music, Spotify and other music apps)</label></section>`:''}<h3 class="sech">Account</h3><section class="card"><h3 style="font-size:18px">Your account</h3><p class="muted" style="font-size:14px">Signed in as <b>${esc(S.email||'')}</b>. Your diary is private to you and syncs across your devices.</p>
   <div class="row"><button class="btn sm" data-act="export">Copy all data as JSON</button><button class="btn sm" data-act="importopen">Import from Tally web</button><button class="btn sm ghost" data-act="signout">Sign out</button></div><details style="margin-top:12px"><summary>Delete my account</summary><p class="faint">Permanently deletes your account, diary, workouts, messages and achievements. This can’t be undone.</p><button class="btn sm" data-act="delacct" style="color:var(--warn)">Delete everything</button></details></section><h3 class="sech">About</h3>${aboutCard()}</div></div>`;
 }
 function saveProfile(){
@@ -1483,7 +1484,7 @@ function importBody(){return `<div class="sheet-h"><h3>Import from Tally web</h3
 function start(user){
   S.uid=user.id;S.email=user.email;
   STORE=createStore({uid:user.id,onChange:(what)=>{S.docs=STORE.docs;syncNote();if(what==='docs'){afterChange();render()}}});
-  S.docs=STORE.docs;socialRealtime();route();loadSocial();loadTogether();loadFx();
+  S.docs=STORE.docs;socialRealtime();route();loadSocial();loadTogether();loadFx();remListen();remSync();
   if(isNative)setTimeout(()=>checkUpdate(false),4000);
   if(hcNative()){setTimeout(()=>hcSync(false),2500);import('@capacitor/app').then(({App})=>App.addListener('resume',()=>hcSync(false))).catch(()=>{})}
 }
@@ -1888,6 +1889,48 @@ document.addEventListener('change',e=>{const t=e.target;
   if(t.classList&&t.classList.contains('rc-g')&&S.rcp){const it=S.rcp.items[+t.dataset.i],v=parseFloat(t.value);if(it&&it.per&&v>=0&&r2(v)!==it.g){it.g=r2(v);it.n=scale(it.per,v);it.amount=''}rcpReadInputs();setTimeout(()=>drawModal(false),0)}
   if(['rc-sv','rc-cw'].includes(t.id)&&S.rcp){rcpReadInputs();setTimeout(()=>drawModal(false),0)}
 });
+
+/* ---------- reminders (Android notifications) ---------- */
+// Weekly check-in: one repeating notification. Meal logging: one notification per day for the next 14 days,
+// skipping today once something is logged, so it only nudges on days you haven't logged yet.
+const REM_DAYS=[[2,'Monday'],[3,'Tuesday'],[4,'Wednesday'],[5,'Thursday'],[6,'Friday'],[7,'Saturday'],[1,'Sunday']];
+const REM_CI_ID=9001,REM_MEAL_BASE=200000;
+function remPrefs(){return Object.assign({ci:true,ciDay:4,ciTime:'06:30',meal:true,mealTime:'19:00'},get('reminders')||{})}
+let LN=null;
+const remNative=()=>isNative||!!window.__tallyNotifMock; // the mock is only used by automated tests
+async function lnBox(){if(window.__tallyNotifMock)return {L:window.__tallyNotifMock};if(!isNative)return {L:null};if(!LN)LN=(await import('@capacitor/local-notifications')).LocalNotifications;return {L:LN}} // boxed: plugin proxies answer `then`
+const dayNum=d=>Math.floor(new Date(d+'T12:00').getTime()/864e5);
+let remSig='',remT=null;
+function remSyncSoon(){clearTimeout(remT);remT=setTimeout(remSync,1500)}
+async function remSync(force){if(!remNative()||!S.uid)return;const p=remPrefs(),t=today(),logged=!!((day(t).foods||[]).length);
+  const sig=JSON.stringify([p,t,logged]);if(!force&&sig===remSig)return;
+  try{const {L}=await lnBox();if(!L)return;
+    if(p.ci||p.meal){let perm=await L.checkPermissions();if(perm.display==='prompt'||perm.display==='prompt-with-rationale')perm=await L.requestPermissions();
+      S.remPerm=perm.display;if(perm.display!=='granted'){if(S.view==='profile')render();return}}
+    const pend=(await L.getPending()).notifications||[];
+    const ours=pend.filter(n=>n.id===REM_CI_ID||(n.id>=REM_MEAL_BASE&&n.id<REM_MEAL_BASE+100000));
+    if(ours.length)await L.cancel({notifications:ours.map(n=>({id:n.id}))});
+    const out=[];
+    if(p.ci){const [h,m]=p.ciTime.split(':').map(Number);out.push({id:REM_CI_ID,title:'Weekly check-in ⚖️',body:'Weigh in, take your measurements and snap this week’s photos.',schedule:{on:{weekday:p.ciDay,hour:h,minute:m},allowWhileIdle:true},extra:{view:'checkin'},smallIcon:'ic_stat_tally'})}
+    if(p.meal){const [h,m]=p.mealTime.split(':').map(Number);
+      for(let i=0;i<14;i++){const d=addDays(t,i);if(i===0&&logged)continue;const at=new Date(d+'T00:00');at.setHours(h,m,0,0);if(at<=new Date())continue;
+        out.push({id:REM_MEAL_BASE+(dayNum(d)%100000),title:'Log today’s meals 🍽',body:'Nothing logged yet today — take a minute to add what you ate.',schedule:{at,allowWhileIdle:true},extra:{view:'diary'},smallIcon:'ic_stat_tally'})}}
+    if(out.length)await L.schedule({notifications:out});
+    remSig=sig;S.remPerm='granted';
+  }catch(e){console.warn('reminders',e)}}
+async function remListen(){if(!remNative())return;try{const {L}=await lnBox();if(!L)return;
+  L.addListener('localNotificationActionPerformed',a=>{const v=a&&a.notification&&a.notification.extra&&a.notification.extra.view;if(v){const ae=document.activeElement;if(ae&&ae.blur)ae.blur();if(location.hash==='#'+v)route();else location.hash='#'+v}})}catch(e){}}
+function remCard(){const p=remPrefs();
+  if(!remNative())return `<section class="card"><h3 style="font-size:18px">Reminders</h3><p class="muted" style="font-size:14px;margin-bottom:0">Reminder notifications work in the Tally Android app. On iPhone, Apple only lets home-screen web apps show notifications sent from a server, which Tally doesn’t have yet.</p></section>`;
+  const opt=cur=>REM_DAYS.map(([n,l])=>`<option value="${n}" ${n===+cur?'selected':''}>${l}</option>`).join('');
+  return `<section class="card"><h3 style="font-size:18px">Reminders</h3>
+  <div class="remrow"><label class="chkrow"><input type="checkbox" class="remtog" data-k="ci" ${p.ci?'checked':''}> Weekly check-in</label><div class="remctl"><select class="inp remset" data-k="ciDay">${opt(p.ciDay)}</select><span class="faint">at</span><input type="time" class="inp remset" data-k="ciTime" value="${p.ciTime}"></div></div>
+  <div class="remrow"><label class="chkrow"><input type="checkbox" class="remtog" data-k="meal" ${p.meal?'checked':''}> Log my meals</label><div class="remctl"><span class="faint">every day at</span><input type="time" class="inp remset" data-k="mealTime" value="${p.mealTime}"></div></div>
+  <p class="faint" style="font-size:13px;margin:8px 0 0">The meal reminder skips any day you’ve already logged food.</p>
+  ${S.remPerm&&S.remPerm!=='granted'?`<div class="notice warn" style="margin-top:10px">Notifications are turned off for Tally. Turn them on in your phone’s Settings → Apps → Tally → Notifications, then come back here.</div>`:''}</section>`}
+document.addEventListener('change',e=>{const t=e.target;if(!t.classList)return;
+  if(t.classList.contains('remtog')||t.classList.contains('remset')){const p=remPrefs(),k=t.dataset.k;
+    p[k]=t.type==='checkbox'?t.checked:k==='ciDay'?+t.value:(t.value||p[k]);put('reminders',p);remSync(true).then(()=>toast(p.ci||p.meal?'Reminders updated':'Reminders off'))}});
 
 const ACT={
   day:el=>{S.date=addDays(S.date,+el.dataset.n);render()},
