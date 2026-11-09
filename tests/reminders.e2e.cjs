@@ -28,7 +28,11 @@ const results = []; const check = (n, ok, x) => { results.push(!!ok); console.lo
       requestPermissions: async () => { window.__asked++; return { display: 'granted' } },
       getPending: async () => ({ notifications: window.__pend.map(n => ({ id: n.id })) }),
       cancel: async ({ notifications }) => { const ids = new Set(notifications.map(n => n.id)); window.__pend = window.__pend.filter(n => !ids.has(n.id)) },
-      schedule: async ({ notifications }) => { window.__pend.push(...notifications.map(n => Object.assign({}, n, { at: n.schedule.at ? new Date(n.schedule.at).toISOString() : null }))); return { notifications } },
+      checkExactNotificationSetting: async () => ({ exact_alarm: 'denied' }), // Android 12+ default for new installs
+      changeExactNotificationSetting: async () => ({ exact_alarm: 'denied' }),
+      // like the real plugin: asking for exact timing without permission detours to a settings page (never resolves here)
+      schedule: async ({ notifications }) => { if (notifications.some(n => n.isExactNotification !== false)) { window.__detour = (window.__detour || 0) + 1; return new Promise(() => {}) }
+        window.__pend.push(...notifications.map(n => Object.assign({}, n, { at: n.schedule.at ? new Date(n.schedule.at).toISOString() : null }))); return { notifications } },
       addListener: (ev, fn) => { window.__listeners[ev] = fn; return { remove() {} } },
     };
   }, [`sb-${REF}-auth-token`, sess]);
@@ -37,6 +41,7 @@ const results = []; const check = (n, ok, x) => { results.push(!!ok); console.lo
   await pg.goto('http://localhost:4173/'); await pg.waitForTimeout(3500);
   const pend = () => pg.evaluate(() => window.__pend);
   let P = await pend();
+  check('no exact-alarm settings detour (would block scheduling)', !(await pg.evaluate(() => window.__detour)));
   check('asked for notification permission once', await pg.evaluate(() => window.__asked) === 1);
   const ci = P.find(n => n.id === 9001);
   check('weekly check-in: Wednesday 6:30', ci && ci.schedule.on.weekday === 4 && ci.schedule.on.hour === 6 && ci.schedule.on.minute === 30, ci && JSON.stringify(ci.schedule));
@@ -69,6 +74,12 @@ const results = []; const check = (n, ok, x) => { results.push(!!ok); console.lo
   check('settings show the saved day and time', await pg.inputValue('.remset[data-k=ciDay]') === '1' && await pg.inputValue('.remset[data-k=ciTime]') === '08:15');
   await pg.locator('.remrow').first().scrollIntoViewIfNeeded();
   await pg.screenshot({ path: '/tmp/rem-settings.png', clip: { x: 0, y: 0, width: 400, height: 860 }, fullPage: false });
+  await pg.check('.remtog[data-k=meal]'); await pg.waitForTimeout(800);
+  const st = await pg.locator('.reminfo').innerText().catch(() => '');
+  check('Settings shows reminders are scheduled and when', /reminders? scheduled/.test(st) && /Next check-in reminder: .*Sun/.test(st) && /Next meal reminder/.test(st), st);
+  await pg.click('[data-act=remtest]'); await pg.waitForTimeout(500);
+  const tst = (await pend()).find(n => n.id === 9999);
+  check('test notification scheduled a few seconds out', tst && new Date(tst.at) - Date.now() < 10000);
   // tapping a notification opens the right tab
   await pg.evaluate(() => window.__listeners.localNotificationActionPerformed({ notification: { extra: { view: 'checkin' } } })); await pg.waitForTimeout(400);
   const h2 = await pg.locator('#view h2').first().innerText(); check('tapping the check-in notification opens Check-in', /Weekly check-in/.test(h2), h2 + ' ' + await pg.evaluate(() => location.hash));

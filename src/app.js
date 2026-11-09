@@ -1900,34 +1900,58 @@ let LN=null;
 const remNative=()=>isNative||!!window.__tallyNotifMock; // the mock is only used by automated tests
 async function lnBox(){if(window.__tallyNotifMock)return {L:window.__tallyNotifMock};if(!isNative)return {L:null};if(!LN)LN=(await import('@capacitor/local-notifications')).LocalNotifications;return {L:LN}} // boxed: plugin proxies answer `then`
 const dayNum=d=>Math.floor(new Date(d+'T12:00').getTime()/864e5);
-let remSig='',remT=null;
+let remSig='',remT=null,remBusy=false;
 function remSyncSoon(){clearTimeout(remT);remT=setTimeout(remSync,1500)}
-async function remSync(force){if(!remNative()||!S.uid)return;const p=remPrefs(),t=today(),logged=!!((day(t).foods||[]).length);
+const remFmt=d=>d.toLocaleString(undefined,{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+function remNextCi(p){const [h,m]=p.ciTime.split(':').map(Number),now=new Date(),d=new Date(now);d.setHours(h,m,0,0);
+  const want=p.ciDay-1;let add=(want-d.getDay()+7)%7;if(add===0&&d<=now)add=7;d.setDate(d.getDate()+add);return d}
+async function remSync(force){if(!remNative()||!S.uid)return;if(remBusy){remSyncSoon();return}
+  const p=remPrefs(),t=today(),logged=!!((day(t).foods||[]).length);
   const sig=JSON.stringify([p,t,logged]);if(!force&&sig===remSig)return;
+  remBusy=true;
   try{const {L}=await lnBox();if(!L)return;
     if(p.ci||p.meal){let perm=await L.checkPermissions();if(perm.display==='prompt'||perm.display==='prompt-with-rationale')perm=await L.requestPermissions();
-      S.remPerm=perm.display;if(perm.display!=='granted'){if(S.view==='profile')render();return}}
+      S.remPerm=perm.display;if(perm.display!=='granted'){S.remInfo=null;if(S.view==='profile')render();return}}
+    // Exact timing only if Android already allows it — otherwise the plugin would stop and open the
+    // "Alarms & reminders" settings page instead of scheduling (Android 12+ denies it by default).
+    let exact=false;try{exact=(await L.checkExactNotificationSetting()).exact_alarm==='granted'}catch(e){}
+    S.remExact=exact;
     const pend=(await L.getPending()).notifications||[];
     const ours=pend.filter(n=>n.id===REM_CI_ID||(n.id>=REM_MEAL_BASE&&n.id<REM_MEAL_BASE+100000));
     if(ours.length)await L.cancel({notifications:ours.map(n=>({id:n.id}))});
-    const out=[];
-    if(p.ci){const [h,m]=p.ciTime.split(':').map(Number);out.push({id:REM_CI_ID,title:'Weekly check-in ⚖️',body:'Weigh in, take your measurements and snap this week’s photos.',schedule:{on:{weekday:p.ciDay,hour:h,minute:m},allowWhileIdle:true},extra:{view:'checkin'},smallIcon:'ic_stat_tally'})}
+    const out=[],info={};
+    if(p.ci){const [h,m]=p.ciTime.split(':').map(Number);info.ci=remNextCi(p);
+      out.push({id:REM_CI_ID,title:'Weekly check-in ⚖️',body:'Weigh in, take your measurements and snap this week’s photos.',schedule:{on:{weekday:p.ciDay,hour:h,minute:m},allowWhileIdle:true},isExactNotification:exact,extra:{view:'checkin'},smallIcon:'ic_stat_tally'})}
     if(p.meal){const [h,m]=p.mealTime.split(':').map(Number);
       for(let i=0;i<14;i++){const d=addDays(t,i);if(i===0&&logged)continue;const at=new Date(d+'T00:00');at.setHours(h,m,0,0);if(at<=new Date())continue;
-        out.push({id:REM_MEAL_BASE+(dayNum(d)%100000),title:'Log today’s meals 🍽',body:'Nothing logged yet today — take a minute to add what you ate.',schedule:{at,allowWhileIdle:true},extra:{view:'diary'},smallIcon:'ic_stat_tally'})}}
+        if(!info.meal)info.meal=at;
+        out.push({id:REM_MEAL_BASE+(dayNum(d)%100000),title:'Log today’s meals 🍽',body:'Nothing logged yet today — take a minute to add what you ate.',schedule:{at,allowWhileIdle:true},isExactNotification:exact,extra:{view:'diary'},smallIcon:'ic_stat_tally'})}}
     if(out.length)await L.schedule({notifications:out});
+    const after=((await L.getPending()).notifications||[]).filter(n=>n.id===REM_CI_ID||(n.id>=REM_MEAL_BASE&&n.id<REM_MEAL_BASE+100000));
+    info.count=after.length;info.todaySkipped=logged&&p.meal;S.remInfo=info;S.remErr='';
     remSig=sig;S.remPerm='granted';
-  }catch(e){console.warn('reminders',e)}}
+  }catch(e){S.remErr=String(e&&e.message||e);console.warn('reminders',e)}
+  finally{remBusy=false;remCardRefresh()}}
+function remCardRefresh(){const c=$('#remcard'),ae=document.activeElement;if(!c||S.view!=='profile')return;if(ae&&c.contains(ae)&&ae.matches('input[type=time],select'))return;c.outerHTML=remCard()}
+async function remTest(){try{const {L}=await lnBox();if(!L)return;let perm=await L.checkPermissions();if(perm.display!=='granted')perm=await L.requestPermissions();
+  if(perm.display!=='granted'){S.remPerm=perm.display;remCardRefresh();return}
+  await L.schedule({notifications:[{id:9999,title:'Tally test ✅',body:'Notifications are working. Your reminders will look like this.',schedule:{at:new Date(Date.now()+5000),allowWhileIdle:true},isExactNotification:!!S.remExact,extra:{view:'profile'},smallIcon:'ic_stat_tally'}]});
+  toast('Test notification in about 5 seconds — you can leave the app')}catch(e){S.remErr=String(e&&e.message||e);remCardRefresh()}}
 async function remListen(){if(!remNative())return;try{const {L}=await lnBox();if(!L)return;
   L.addListener('localNotificationActionPerformed',a=>{const v=a&&a.notification&&a.notification.extra&&a.notification.extra.view;if(v){const ae=document.activeElement;if(ae&&ae.blur)ae.blur();if(location.hash==='#'+v)route();else location.hash='#'+v}})}catch(e){}}
 function remCard(){const p=remPrefs();
   if(!remNative())return `<section class="card"><h3 style="font-size:18px">Reminders</h3><p class="muted" style="font-size:14px;margin-bottom:0">Reminder notifications work in the Tally Android app. On iPhone, Apple only lets home-screen web apps show notifications sent from a server, which Tally doesn’t have yet.</p></section>`;
   const opt=cur=>REM_DAYS.map(([n,l])=>`<option value="${n}" ${n===+cur?'selected':''}>${l}</option>`).join('');
-  return `<section class="card"><h3 style="font-size:18px">Reminders</h3>
+  return `<section class="card" id="remcard"><h3 style="font-size:18px">Reminders</h3>
   <div class="remrow"><label class="chkrow"><input type="checkbox" class="remtog" data-k="ci" ${p.ci?'checked':''}> Weekly check-in</label><div class="remctl"><select class="inp remset" data-k="ciDay">${opt(p.ciDay)}</select><span class="faint">at</span><input type="time" class="inp remset" data-k="ciTime" value="${p.ciTime}"></div></div>
   <div class="remrow"><label class="chkrow"><input type="checkbox" class="remtog" data-k="meal" ${p.meal?'checked':''}> Log my meals</label><div class="remctl"><span class="faint">every day at</span><input type="time" class="inp remset" data-k="mealTime" value="${p.mealTime}"></div></div>
   <p class="faint" style="font-size:13px;margin:8px 0 0">The meal reminder skips any day you’ve already logged food.</p>
+  ${S.remInfo&&(p.ci||p.meal)?`<div class="reminfo">${S.remInfo.count?'✅':'⚠️'} ${S.remInfo.count} reminder${S.remInfo.count===1?'':'s'} scheduled on this phone.${p.ci&&S.remInfo.ci?`<br>Next check-in reminder: <b>${esc(remFmt(S.remInfo.ci))}</b>`:''}${p.meal&&S.remInfo.meal?`<br>Next meal reminder: <b>${esc(remFmt(S.remInfo.meal))}</b>${S.remInfo.todaySkipped?' <span class="faint">(today skipped — you’ve logged food)</span>':''}`:''}${S.remExact?'':'<br><span class="faint">Android may deliver these a few minutes late to save battery.</span>'}</div>`:''}
+  ${S.remErr?`<div class="notice warn" style="margin-top:10px">Reminder problem: ${esc(S.remErr)}</div>`:''}
+  <div class="row" style="margin-top:10px"><button class="btn sm" data-act="remtest">Send a test notification</button>${S.remInfo&&!S.remExact?'<button class="btn sm ghost" data-act="remexact">Exact timing</button>':''}</div>
+  <details style="margin-top:10px"><summary>Not getting reminders?</summary><p class="faint" style="font-size:13px">Samsung phones put apps they think are unused to sleep, which stops their reminders. Open your phone’s <b>Settings → Apps → Tally → Battery</b> and choose <b>Unrestricted</b>. Also check <b>Settings → Notifications</b> that Tally is allowed, then tap <b>Send a test notification</b>.</p></details>
   ${S.remPerm&&S.remPerm!=='granted'?`<div class="notice warn" style="margin-top:10px">Notifications are turned off for Tally. Turn them on in your phone’s Settings → Apps → Tally → Notifications, then come back here.</div>`:''}</section>`}
+const NACT={remtest:()=>remTest(),remexact:async()=>{try{const {L}=await lnBox();await L.changeExactNotificationSetting();}catch(e){}remSync(true)}};
 document.addEventListener('change',e=>{const t=e.target;if(!t.classList)return;
   if(t.classList.contains('remtog')||t.classList.contains('remset')){const p=remPrefs(),k=t.dataset.k;
     p[k]=t.type==='checkbox'?t.checked:k==='ciDay'?+t.value:(t.value||p[k]);put('reminders',p);remSync(true).then(()=>toast(p.ci||p.meal?'Reminders updated':'Reminders off'))}});
@@ -1974,7 +1998,7 @@ const ACT={
   delcustom:el=>{const doc=get('custom')||{foods:[]};doc.foods=doc.foods.filter(f=>f.id!==el.dataset.id);put('custom',doc);toast('Food deleted')},
   export:async()=>{const txt=JSON.stringify(S.docs,null,1);try{await navigator.clipboard.writeText(txt);toast('Copied your data to the clipboard')}catch(e){toast('Copy was blocked by the browser')}}
 };
-Object.assign(ACT,WACT,SACT,AACT,HACT,MACT,VACT,FACT,TACT,CACT,XACT,RACT);
+Object.assign(ACT,WACT,SACT,AACT,HACT,MACT,VACT,FACT,TACT,CACT,XACT,RACT,NACT);
 document.addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');
   if(!el){if(e.target.id==='modal')closeModal();return}

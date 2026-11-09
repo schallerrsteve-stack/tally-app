@@ -362,3 +362,4 @@ body:has(#fab) main{padding-bottom:110px}
 .rctot>div{display:flex;flex-direction:column;gap:2px}.rctot b{font-size:15px}
 .remrow{padding:10px 0;border-bottom:1px solid var(--line)}.remrow:last-of-type{border-bottom:0}
 .remctl{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0 0 28px}.remctl .inp{width:auto;min-width:0}
+.reminfo{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--soft);font-size:14px;line-height:1.55}
