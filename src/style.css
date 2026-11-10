@@ -363,3 +363,8 @@ body:has(#fab) main{padding-bottom:110px}
 .remrow{padding:10px 0;border-bottom:1px solid var(--line)}.remrow:last-of-type{border-bottom:0}
 .remctl{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0 0 28px}.remctl .inp{width:auto;min-width:0}
 .reminfo{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--soft);font-size:14px;line-height:1.55}
+/* quote of the day */
+.qcard{position:relative;margin-bottom:16px;padding:16px 18px 14px 46px}
+.qcard .qmark{position:absolute;left:14px;top:4px;font-family:Fraunces,serif;font-size:46px;line-height:1;color:var(--accent);opacity:.75}
+.qcard blockquote{margin:0;font-family:Fraunces,serif;font-size:16.5px;line-height:1.45}
+.qcard .qby{margin-top:8px;font-size:13px;color:var(--ink2)}

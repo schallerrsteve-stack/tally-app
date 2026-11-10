@@ -1,5 +1,6 @@
 import { MediaControl, sb, isNative, currentUser, sendCode, verifyCode, signOut, createStore, sample, offProduct, offCached, offSearch, nativeScan } from './platform.js';
 import './style.css';
+import { QUOTES, QUOTE_TR } from './quotes.js';
 
 "use strict";
 /* ---------- nutrients & food database ---------- */
@@ -137,6 +138,7 @@ function vDiary(){
     ${isToday?'':'<button class="btn sm" data-act="today">Today</button>'}
   </div>`;
   if(!S.docs.profile)h+=`<div class="card setup" style="margin-bottom:18px"><div class="spread"><div><h3 style="font-size:18px">Set your personal targets</h3><div class="muted" style="font-size:14px">Add your age, height, weight and goal so calorie and nutrient targets fit you. Defaults are shown until then.</div></div><a class="btn primary" href="#profile">Set up</a></div></div>`;
+  h+=quoteCard();
   h+=`<div class="grid"><div class="stack">`+SUM('m-only');
   for(const [mk,ml] of MEALS){
     const list=d.foods.filter(e=>e.meal===mk),mk_k=Math.round(sumN(list).kcal);
@@ -1894,8 +1896,14 @@ document.addEventListener('change',e=>{const t=e.target;
 // Weekly check-in: one repeating notification. Meal logging: one notification per day for the next 14 days,
 // skipping today once something is logged, so it only nudges on days you haven't logged yet.
 const REM_DAYS=[[2,'Monday'],[3,'Tuesday'],[4,'Wednesday'],[5,'Thursday'],[6,'Friday'],[7,'Saturday'],[1,'Sunday']];
-const REM_CI_ID=9001,REM_MEAL_BASE=200000;
-function remPrefs(){return Object.assign({ci:true,ciDay:4,ciTime:'06:30',meal:true,mealTime:'19:00'},get('reminders')||{})}
+const REM_CI_ID=9001,REM_MEAL_BASE=200000,REM_Q_BASE=400000;
+function remPrefs(){return Object.assign({ci:true,ciDay:4,ciTime:'06:30',meal:true,mealTime:'19:00',q:true,qTime:'12:00'},get('reminders')||{})}
+// Quote of the day: a fixed shuffle of the list, so each quote comes round once before any repeats,
+// and the notification and the Diary card show the same quote on a given day.
+const Q_ORDER=(()=>{const n=QUOTES.length,a=[...Array(n).keys()];let x=20261110;for(let i=n-1;i>0;i--){x=(x*1103515245+12345)%2147483648;const j=x%(i+1);[a[i],a[j]]=[a[j],a[i]]}return a})();
+function quoteFor(d){const [t,a,src]=QUOTES[Q_ORDER[((Math.floor(new Date(d+'T12:00').getTime()/864e5)%QUOTES.length)+QUOTES.length)%QUOTES.length]];return {t,a,src,tr:QUOTE_TR[a]}}
+function quoteCard(){if(!remPrefs().q||S.date!==today())return '';const q=quoteFor(today());
+  return `<section class="card qcard"><div class="qmark" aria-hidden="true">“</div><blockquote>${esc(q.t)}</blockquote><div class="qby">— ${esc(q.a)}, <i>${esc(q.src)}</i> <span class="faint">(${esc(q.tr)})</span></div></section>`}
 let LN=null;
 const remNative=()=>isNative||!!window.__tallyNotifMock; // the mock is only used by automated tests
 async function lnBox(){if(window.__tallyNotifMock)return {L:window.__tallyNotifMock};if(!isNative)return {L:null};if(!LN)LN=(await import('@capacitor/local-notifications')).LocalNotifications;return {L:LN}} // boxed: plugin proxies answer `then`
@@ -1910,14 +1918,15 @@ async function remSync(force){if(!remNative()||!S.uid)return;if(remBusy){remSync
   const sig=JSON.stringify([p,t,logged]);if(!force&&sig===remSig)return;
   remBusy=true;
   try{const {L}=await lnBox();if(!L)return;
-    if(p.ci||p.meal){let perm=await L.checkPermissions();if(perm.display==='prompt'||perm.display==='prompt-with-rationale')perm=await L.requestPermissions();
+    if(p.ci||p.meal||p.q){let perm=await L.checkPermissions();if(perm.display==='prompt'||perm.display==='prompt-with-rationale')perm=await L.requestPermissions();
       S.remPerm=perm.display;if(perm.display!=='granted'){S.remInfo=null;if(S.view==='profile')render();return}}
     // Exact timing only if Android already allows it — otherwise the plugin would stop and open the
     // "Alarms & reminders" settings page instead of scheduling (Android 12+ denies it by default).
     let exact=false;try{exact=(await L.checkExactNotificationSetting()).exact_alarm==='granted'}catch(e){}
     S.remExact=exact;
     const pend=(await L.getPending()).notifications||[];
-    const ours=pend.filter(n=>n.id===REM_CI_ID||(n.id>=REM_MEAL_BASE&&n.id<REM_MEAL_BASE+100000));
+    const mine=n=>n.id===REM_CI_ID||(n.id>=REM_MEAL_BASE&&n.id<REM_MEAL_BASE+100000)||(n.id>=REM_Q_BASE&&n.id<REM_Q_BASE+100000);
+    const ours=pend.filter(mine);
     if(ours.length)await L.cancel({notifications:ours.map(n=>({id:n.id}))});
     const out=[],info={};
     if(p.ci){const [h,m]=p.ciTime.split(':').map(Number);info.ci=remNextCi(p);
@@ -1926,8 +1935,12 @@ async function remSync(force){if(!remNative()||!S.uid)return;if(remBusy){remSync
       for(let i=0;i<14;i++){const d=addDays(t,i);if(i===0&&logged)continue;const at=new Date(d+'T00:00');at.setHours(h,m,0,0);if(at<=new Date())continue;
         if(!info.meal)info.meal=at;
         out.push({id:REM_MEAL_BASE+(dayNum(d)%100000),title:'Log today’s meals 🍽',body:'Nothing logged yet today — take a minute to add what you ate.',schedule:{at,allowWhileIdle:true},isExactNotification:exact,extra:{view:'diary'},smallIcon:'ic_stat_tally'})}}
+    if(p.q){const [h,m]=p.qTime.split(':').map(Number);
+      for(let i=0;i<14;i++){const d=addDays(t,i),at=new Date(d+'T00:00');at.setHours(h,m,0,0);if(at<=new Date())continue;const q=quoteFor(d);
+        if(!info.q)info.q=at;
+        out.push({id:REM_Q_BASE+(dayNum(d)%100000),title:q.a,body:q.t,largeBody:q.t,summaryText:q.src,schedule:{at,allowWhileIdle:true},isExactNotification:exact,extra:{view:'diary'},smallIcon:'ic_stat_tally'})}}
     if(out.length)await L.schedule({notifications:out});
-    const after=((await L.getPending()).notifications||[]).filter(n=>n.id===REM_CI_ID||(n.id>=REM_MEAL_BASE&&n.id<REM_MEAL_BASE+100000));
+    const after=((await L.getPending()).notifications||[]).filter(mine);
     info.count=after.length;info.todaySkipped=logged&&p.meal;S.remInfo=info;S.remErr='';
     remSig=sig;S.remPerm='granted';
   }catch(e){S.remErr=String(e&&e.message||e);console.warn('reminders',e)}
@@ -1945,8 +1958,9 @@ function remCard(){const p=remPrefs();
   return `<section class="card" id="remcard"><h3 style="font-size:18px">Reminders</h3>
   <div class="remrow"><label class="chkrow"><input type="checkbox" class="remtog" data-k="ci" ${p.ci?'checked':''}> Weekly check-in</label><div class="remctl"><select class="inp remset" data-k="ciDay">${opt(p.ciDay)}</select><span class="faint">at</span><input type="time" class="inp remset" data-k="ciTime" value="${p.ciTime}"></div></div>
   <div class="remrow"><label class="chkrow"><input type="checkbox" class="remtog" data-k="meal" ${p.meal?'checked':''}> Log my meals</label><div class="remctl"><span class="faint">every day at</span><input type="time" class="inp remset" data-k="mealTime" value="${p.mealTime}"></div></div>
+  <div class="remrow"><label class="chkrow"><input type="checkbox" class="remtog" data-k="q" ${p.q?'checked':''}> Daily quote <span class="faint">— Marcus Aurelius, Epictetus, Seneca</span></label><div class="remctl"><span class="faint">every day at</span><input type="time" class="inp remset" data-k="qTime" value="${p.qTime}"></div></div>
   <p class="faint" style="font-size:13px;margin:8px 0 0">The meal reminder skips any day you’ve already logged food.</p>
-  ${S.remInfo&&(p.ci||p.meal)?`<div class="reminfo">${S.remInfo.count?'✅':'⚠️'} ${S.remInfo.count} reminder${S.remInfo.count===1?'':'s'} scheduled on this phone.${p.ci&&S.remInfo.ci?`<br>Next check-in reminder: <b>${esc(remFmt(S.remInfo.ci))}</b>`:''}${p.meal&&S.remInfo.meal?`<br>Next meal reminder: <b>${esc(remFmt(S.remInfo.meal))}</b>${S.remInfo.todaySkipped?' <span class="faint">(today skipped — you’ve logged food)</span>':''}`:''}${S.remExact?'':'<br><span class="faint">Android may deliver these a few minutes late to save battery.</span>'}</div>`:''}
+  ${S.remInfo&&(p.ci||p.meal||p.q)?`<div class="reminfo">${S.remInfo.count?'✅':'⚠️'} ${S.remInfo.count} reminder${S.remInfo.count===1?'':'s'} scheduled on this phone.${p.ci&&S.remInfo.ci?`<br>Next check-in reminder: <b>${esc(remFmt(S.remInfo.ci))}</b>`:''}${p.meal&&S.remInfo.meal?`<br>Next meal reminder: <b>${esc(remFmt(S.remInfo.meal))}</b>${S.remInfo.todaySkipped?' <span class="faint">(today skipped — you’ve logged food)</span>':''}`:''}${p.q&&S.remInfo.q?`<br>Next daily quote: <b>${esc(remFmt(S.remInfo.q))}</b>`:''}${S.remExact?'':'<br><span class="faint">Android may deliver these a few minutes late to save battery.</span>'}</div>`:''}
   ${S.remErr?`<div class="notice warn" style="margin-top:10px">Reminder problem: ${esc(S.remErr)}</div>`:''}
   <div class="row" style="margin-top:10px"><button class="btn sm" data-act="remtest">Send a test notification</button>${S.remInfo&&!S.remExact?'<button class="btn sm ghost" data-act="remexact">Exact timing</button>':''}</div>
   <details style="margin-top:10px"><summary>Not getting reminders?</summary><p class="faint" style="font-size:13px">Samsung phones put apps they think are unused to sleep, which stops their reminders. Open your phone’s <b>Settings → Apps → Tally → Battery</b> and choose <b>Unrestricted</b>. Also check <b>Settings → Notifications</b> that Tally is allowed, then tap <b>Send a test notification</b>.</p></details>
@@ -1954,7 +1968,7 @@ function remCard(){const p=remPrefs();
 const NACT={remtest:()=>remTest(),remexact:async()=>{try{const {L}=await lnBox();await L.changeExactNotificationSetting();}catch(e){}remSync(true)}};
 document.addEventListener('change',e=>{const t=e.target;if(!t.classList)return;
   if(t.classList.contains('remtog')||t.classList.contains('remset')){const p=remPrefs(),k=t.dataset.k;
-    p[k]=t.type==='checkbox'?t.checked:k==='ciDay'?+t.value:(t.value||p[k]);put('reminders',p);remSync(true).then(()=>toast(p.ci||p.meal?'Reminders updated':'Reminders off'))}});
+    p[k]=t.type==='checkbox'?t.checked:k==='ciDay'?+t.value:(t.value||p[k]);put('reminders',p);remSync(true).then(()=>toast(p.ci||p.meal||p.q?'Reminders updated':'Reminders off'))}});
 
 const ACT={
   day:el=>{S.date=addDays(S.date,+el.dataset.n);render()},

@@ -46,17 +46,23 @@ const results = []; const check = (n, ok, x) => { results.push(!!ok); console.lo
   const ci = P.find(n => n.id === 9001);
   check('weekly check-in: Wednesday 6:30', ci && ci.schedule.on.weekday === 4 && ci.schedule.on.hour === 6 && ci.schedule.on.minute === 30, ci && JSON.stringify(ci.schedule));
   check('check-in opens the Check-in tab', ci && ci.extra.view === 'checkin');
-  const meals = P.filter(n => n.id >= 200000);
+  const meals = P.filter(n => n.id >= 200000 && n.id < 300000);
   check('meal reminders for the coming days at 7:00 pm', meals.length >= 13 && meals.every(n => { const d = new Date(n.at); return d.getHours() === 19 && d.getMinutes() === 0 }), meals.map(n => n.at).slice(0, 3).join(', '));
   check('no reminder scheduled in the past', meals.every(n => new Date(n.at) > new Date()));
   const t = new Date(); const todays = meals.find(n => new Date(n.at).toDateString() === t.toDateString());
   const before7 = t.getHours() < 19;
   check(before7 ? 'today’s 7 pm reminder is set (nothing logged yet)' : 'after 7 pm: today skipped', before7 ? !!todays : !todays);
+  const qs = P.filter(n => n.id >= 400000 && n.id < 500000);
+  check('daily quote at 12:00 for the coming days', qs.length >= 13 && qs.every(n => { const d = new Date(n.at); return d.getHours() === 12 && d.getMinutes() === 0 }), qs.length);
+  check('a different quote each day', new Set(qs.map(n => n.body)).size === qs.length);
+  check('quote notifications credit the author and passage', qs.every(n => /Marcus Aurelius|Epictetus|Seneca/.test(n.title) && n.summaryText && n.largeBody === n.body));
+  const card = await pg.locator('.qcard').innerText().catch(() => '');
+  check('today’s quote shown on the Diary', /Marcus Aurelius|Epictetus|Seneca/.test(card) && card.length > 40, card.slice(0, 80));
   // log a food today → today's reminder is cancelled, the rest stay
   await pg.click('[data-act=add][data-meal]'); await pg.waitForTimeout(2500);
   await pg.fill('#fq', 'banana'); await pg.dispatchEvent('#fq', 'input'); await pg.waitForTimeout(600);
   await pg.locator('#fres [data-act=pick]').first().click(); await pg.waitForTimeout(300); await pg.click('[data-act=savefood]'); await pg.waitForTimeout(2500);
-  P = await pend(); const meals2 = P.filter(n => n.id >= 200000);
+  P = await pend(); const meals2 = P.filter(n => n.id >= 200000 && n.id < 300000);
   check('logging food cancels today’s meal reminder', !meals2.some(n => new Date(n.at).toDateString() === t.toDateString()));
   check('future days still have reminders', meals2.length >= 12);
   check('no duplicate notifications after rescheduling', new Set(P.map(n => n.id)).size === P.length);
@@ -68,7 +74,7 @@ const results = []; const check = (n, ok, x) => { results.push(!!ok); console.lo
   await pg.uncheck('.remtog[data-k=meal]'); await pg.waitForTimeout(600);
   P = await pend(); const ci2 = P.find(n => n.id === 9001);
   check('check-in moved to Sunday 8:15', ci2 && ci2.schedule.on.weekday === 1 && ci2.schedule.on.hour === 8 && ci2.schedule.on.minute === 15, ci2 && JSON.stringify(ci2.schedule));
-  check('meal reminders turned off', !P.some(n => n.id >= 200000));
+  check('meal reminders turned off', !P.some(n => n.id >= 200000 && n.id < 300000));
   check('settings saved to your account', DOCS.reminders && DOCS.reminders.ciDay === 1 && DOCS.reminders.meal === false);
   await pg.evaluate(() => document.activeElement.blur()); await pg.click('nav a[data-v=diary]'); await pg.click('header a.cog'); await pg.waitForTimeout(400);
   check('settings show the saved day and time', await pg.inputValue('.remset[data-k=ciDay]') === '1' && await pg.inputValue('.remset[data-k=ciTime]') === '08:15');
