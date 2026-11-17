@@ -269,6 +269,7 @@ function vFoods(){
   ${rs.length?`<div class="rlist">${rs.map(f=>`<div class="rrow"><button class="res" data-act="editrecipe" data-id="${f.id}" style="flex:1;min-width:0"><span class="t"><div class="nm">🍲 ${esc(f.name)}</div><div class="sub">${sub(f)} · makes ${f.recipe.servings}</div></span></button><button class="btn sm" data-act="logrecipe" data-id="${f.id}">+ Log</button></div>`).join('')}</div>`
   :`<p class="faint" style="margin:8px 0 0">Build a dish from its ingredients — search them, scan their barcodes one after another, or scan a whole recipe card, page or screenshot. Tally works out the nutrition per serving, and the recipe shows up when you search for food.</p>`}</section>
   <section class="card" style="padding:0;margin-top:18px"><div class="spread" style="padding:14px 18px 6px"><h3 style="font-size:18px">My foods</h3><span class="row"><button class="btn sm" data-act="newscan">Scan a barcode</button><button class="btn sm" data-act="newcustom">+ Create food</button></span></div>${cs.length?cs.map(f=>`<div class="entry"><div class="main" style="cursor:default"><span class="t"><div class="nm">${esc(f.name)}${(f.codes||[]).length?` <span class="tag">▮▯▮ ${esc(prettyCode(f.codes[0]))}</span>`:''}</div><div class="sub">${sub(f)}</div></span></div><button class="x" data-act="delcustom" data-id="${f.id}" aria-label="Delete ${esc(f.name)}">×</button></div>`).join(''):`<div class="empty" style="border:0;padding:22px">No custom foods yet. Create one from a nutrition label, or scan a product Tally doesn’t know.</div>`}</section>
+  ${fhCard()}
   <p class="faint" style="margin-top:14px">Search covers Health Canada’s Canadian Nutrient File (5,690 foods, with Canadian fortification levels and French names) and the USDA National Nutrient Database (about 8,800 foods), with 19 nutrients each. Barcodes are looked up live on <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL) and kept on your phone. For anything else, use <b>Describe it</b> in the add-food window to have Claude estimate the nutrition, or create your own food here.</p>`;
 }
 
@@ -364,25 +365,32 @@ function recents(){
   }
   return out;
 }
-function allFoods(){return customs().map(c=>Object.assign({},c,{cat:'My foods',pop:true,hay:' '+c.name.toLowerCase().replace(/[^a-z0-9%]+/g,' ')+' '})).concat(DB.foods)}
+function allFoods(){const cs=customs(),ids=new Set(cs.map(c=>c.id));
+  const hist=Object.values(fhDoc().items).map(fhFood).filter(f=>f&&!DB.map[f.id]&&!ids.has(f.id)).map(f=>Object.assign({},f,{pop:true,hay:' '+String(f.name).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9%]+/g,' ')+' '}));
+  return hist.concat(cs.map(c=>Object.assign({},c,{cat:'My foods',pop:true,hay:' '+c.name.toLowerCase().replace(/[^a-z0-9%]+/g,' ')+' '}))).concat(DB.foods)}
 function results(){
   M.cache={};const q=(M.q||'').trim().toLowerCase();
   const row=f=>{M.cache[f.id]=f;const p=f.portions[0];return `<button class="res" data-act="pick" data-fid="${esc(f.id)}"><span class="t"><div class="nm">${esc(f.name)}</div>${f.usda&&f.usda!==f.name?`<div class="sub">${esc(f.usda)}</div>`:''}<div class="sub">${esc(p[0])}${p[0]!=='g'?` (${Math.round(p[1])} g)`:''} · ${Math.round(f.per.kcal*(p[0]==='g'?100:p[1])/100)} kcal${p[0]==='g'?' per 100 g':''}</div></span><span class="tags"><span class="tag ${f.cat==='My foods'?'mine':''}">${esc(f.cat)}</span>${f.src?`<span class="src">${f.src==='Health Canada'?'Health Canada':'USDA'}</span>`:''}</span></button>`};
   if(!q){
-    const rc=recents();let h='';
-    if(rc.length)h+=`<div class="group">Recent</div>`+rc.map(row).join('');
+    let h='';const {usual,recent}=fhLists(M.meal),shown=new Set();
+    const hrow=r=>{const f=fhFood(r);if(!f||shown.has(f.id))return '';shown.add(f.id);return row(f).replace('</span></span></button>',`</span></span></button>`).replace(/(<div class="sub">)([^<]*)(<\/div><\/span>)/,(m,a,b,c)=>a+b+fhSub(r)+c)};
+    if(usual.length)h+=`<div class="group">Usual for ${esc(mealName(M.meal))}</div>`+usual.map(hrow).join('');
+    let rc=recent.map(hrow).join('');
+    if(!rc&&!usual.length)rc=recents().map(row).join('');
+    if(rc)h+=`<div class="group">Recent</div>`+rc;
     const cs=customs();if(cs.length)h+=`<div class="group">My foods</div>`+cs.map(c=>row(Object.assign({},c,{cat:'My foods'}))).join('');
     if(!h)h=`<div class="empty" style="border:0">Search about 14,500 foods from Health Canada’s Canadian Nutrient File and the USDA database, or scan a product’s barcode. Can’t find something? Try <b>Describe it</b>.</div>`;
     return h;
   }
   const toks=q.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9%]+/g,' ').trim().split(' ').filter(Boolean);
   if(!toks.length)return '';
-  const scored=[];
+  const scored=[],H=fhDoc().items;
   for(const f of allFoods()){
     let ok=true,sc=0;
     for(const t of toks){const i=f.hay.indexOf(' '+t);if(i<0){ok=false;break}sc+=i}
     if(!ok)continue;
     if(f.cat==='My foods')sc-=400;else if(f.pop)sc-=300;else if(f.src==='Health Canada')sc-=8;
+    const hr=H[fhKey(f)];if(hr)sc-=500+Math.min(hr.n||0,30)*12;
     if(f.name.toLowerCase().startsWith(toks[0]))sc-=60;
     if(/baby|indigenous/i.test(f.cat))sc+=200;
     sc+=f.name.length*0.6;
@@ -395,7 +403,7 @@ function results(){
   h+=scored.slice(0,40).map(x=>row(x[1])).join('');
   const qq=toks.join(' ');
   if(qq.length>=3){
-    const seen=new Set();const cached=offCached(qq).map(r=>(seen.add(r.code),{c:r.code,n:r.name,b:r.brand}));
+    const seen=new Set(Object.keys(H).filter(k=>/^o\d/.test(k)).map(k=>k.slice(1)));const cached=offCached(qq).filter(r=>!seen.has(r.code)).map(r=>(seen.add(r.code),{c:r.code,n:r.name,b:r.brand}));
     const live=(M.offQ===qq&&M.offRes?M.offRes:[]).filter(r=>!seen.has(r.code)).map(r=>({c:r.code,n:r.name,b:r.brand}));
     const hits=cached.concat(live).slice(0,25);
     if(hits.length)h+=`<div class="group">Packaged products · Open Food Facts</div>`+hits.map(it=>`<button class="res" data-act="pickoff" data-code="${esc(it.c)}"><span class="t"><div class="nm">${esc(it.n)}</div><div class="sub">${esc(it.b||'')}${it.b?' · ':''}barcode ${esc(prettyCode(it.c))}</div></span><span class="tags"><span class="tag">Packaged</span><span class="src">Open Food Facts</span></span></button>`).join('');
@@ -430,7 +438,7 @@ function saveFood(){
   const e={id:M.editId||newId(),fid:f.id,name:f.name,meal,qty:M.qty,unit,unitG,g:r2(g),per:f.per,n:scale(f.per,g)};
   const d=day(S.date);
   if(M.editId){const i=d.foods.findIndex(x=>x.id===M.editId);if(i>=0)d.foods[i]=e;else d.foods.push(e)}else d.foods.push(e);
-  const wasEdit=!!M.editId;closeModal();put(dk(S.date),d);toast(wasEdit?'Entry updated':`Added to ${mealName(meal)}`);
+  const wasEdit=!!M.editId,hq=M.qty;closeModal();put(dk(S.date),d);if(!wasEdit)fhRecordAll([{f,meal,qty:hq,unit,date:S.date}]);toast(wasEdit?'Entry updated':`Added to ${mealName(meal)}`);
 }
 /* AI */
 function aiBody(){
@@ -475,7 +483,9 @@ function aiAdd(){
   const meal=$('#meal').value,d=day(S.date);
   for(const it of M.ai){const per=it.g>0?Object.fromEntries(KEYS.map(k=>[k,r2(it.n[k]*100/it.g)])):null;
     d.foods.push(per?{id:newId(),fid:null,name:it.name,meal,qty:1,unit:it.amount,unitG:r2(it.g),g:r2(it.g),per,n:it.n,src:'ai'}:{id:newId(),name:it.name,meal,amount:it.amount,n:it.n,src:'ai'})}
-  const c=M.ai.length;closeModal();put(dk(S.date),d);toast(`Added ${c} item${c>1?'s':''} to ${mealName(meal)}`);
+  const aiItems=M.ai;const c=M.ai.length;closeModal();put(dk(S.date),d);
+  fhRecordAll(aiItems.filter(it=>it.g>0).map(it=>({f:{name:it.name,cat:'Yours',per:Object.fromEntries(KEYS.map(k=>[k,r2(it.n[k]*100/it.g)])),portions:[[it.amount||'serving',r2(it.g)],['g',1]]},meal,qty:1,unit:it.amount||'serving',date:S.date})));
+  toast(`Added ${c} item${c>1?'s':''} to ${mealName(meal)}`);
 }
 /* custom food */
 function customBody(){
@@ -600,11 +610,11 @@ function scanBody(){
 function findByCode(code){return customs().find(c=>(c.codes||[]).includes(code))}
 async function gotCode(code){
   const f=findByCode(code);
-  if(f){M.scan={stage:'start'};M.sel=Object.assign({},f,{cat:'My foods'});M.qty=1;M.pi=0;drawModal();toast('Found '+f.name);return}
+  if(f){M.scan={stage:'start'};M.sel=Object.assign({},f,{cat:'My foods'});M.qty=1;M.pi=0;fhPrefill(M.sel);drawModal();toast('Found '+f.name);return}
   const m=M;M.scan={stage:'busy',msg:'Looking up '+prettyCode(code)+'…'};drawModal(false);
   let p=null;try{p=await offLookup(code);if(!p&&code.length===13&&code[0]==='0')p=null}catch(e){}
   if(M!==m)return;
-  if(p){M.scan={stage:'start'};M.sel=p;M.qty=1;M.pi=0;drawModal();toast('Found '+p.name);return}
+  if(p){fhRecordAll([{f:p}],{scanOnly:true});M.scan={stage:'start'};M.sel=p;M.qty=1;M.pi=0;fhPrefill(p);drawModal();toast('Found '+p.name);return}
   M.scan={stage:'new',code};drawModal(false);
 }
 async function onBarcodeFile(file){
@@ -1487,6 +1497,7 @@ function start(user){
   S.uid=user.id;S.email=user.email;
   STORE=createStore({uid:user.id,onChange:(what)=>{S.docs=STORE.docs;syncNote();if(what==='docs'){afterChange();render()}}});
   S.docs=STORE.docs;socialRealtime();route();loadSocial();loadTogether();loadFx();remListen();remSync();
+    if(!(get('foodhist')||{}).bf)setTimeout(()=>loadDB().then(()=>{if(S.uid)fhBackfill()}).catch(()=>{}),3000);
   if(isNative)setTimeout(()=>checkUpdate(false),4000);
   if(hcNative()){setTimeout(()=>hcSync(false),2500);import('@capacitor/app').then(({App})=>App.addListener('resume',()=>hcSync(false))).catch(()=>{})}
 }
@@ -1970,12 +1981,53 @@ document.addEventListener('change',e=>{const t=e.target;if(!t.classList)return;
   if(t.classList.contains('remtog')||t.classList.contains('remset')){const p=remPrefs(),k=t.dataset.k;
     p[k]=t.type==='checkbox'?t.checked:k==='ciDay'?+t.value:(t.value||p[k]);put('reminders',p);remSync(true).then(()=>toast(p.ci||p.meal||p.q?'Reminders updated':'Reminders off'))}});
 
+/* ---------- personal food history (synced to the account) ---------- */
+// doc 'foodhist' = {bf:1, items:{key:{f,n,last,meals:{b,l,d,s},qty,unit}}}
+// Everything a person logs (search, barcode, created, described, recipe) is remembered here so it comes
+// first in search and the empty search screen can offer "usual for this meal" and "recent".
+// Database foods are stored by id only (the bundled database rehydrates them); everything else keeps a snapshot.
+const FH_MAX=300;
+function fhKey(f){if(!f)return null;if(f.code)return 'o'+f.code;if(f.id&&!/^(r-|h-)/.test(f.id))return f.id;return 'n:'+String(f.name||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
+function fhSnap(f){if(!f)return null;if(DB.map[f.id])return {id:f.id,name:f.name,db:1};
+  return {id:f.id&&!/^(r-|h-)/.test(f.id)?f.id:'h-'+fhKey(f).slice(2),name:f.name,cat:f.cat,src:f.src,code:f.code,per:f.per,portions:(f.portions||[['g',1]]).slice(0,6),serving:f.serving}}
+function fhDoc(){const d=get('foodhist');return d&&d.items?d:{items:{}}}
+function fhRecordAll(list,opts){opts=opts||{};const doc=fhDoc(),it=doc.items;let ch=false;
+  for(const x of list){const k=fhKey(x.f);if(!k||!x.f.per)continue;const r=it[k]||(it[k]={n:0,meals:{}});
+    r.f=fhSnap(x.f);if(!opts.scanOnly){r.n=(r.n||0)+1;if(x.meal)r.meals[x.meal]=(r.meals[x.meal]||0)+1;r.qty=x.qty;r.unit=x.unit}
+    r.last=x.date&&(!r.last||x.date>r.last)?x.date:(r.last||today());ch=true}
+  const ks=Object.keys(it);if(ks.length>FH_MAX){ks.sort((a,b)=>fhScore(it[a])-fhScore(it[b]));for(const k of ks.slice(0,ks.length-FH_MAX))delete it[k]}
+  if(ch||opts.force)put('foodhist',doc)}
+function fhScore(r){const age=Math.max(0,(dayNum(today())-dayNum(r.last||'2000-01-01')));return (r.n||0)*3-age/7}
+function fhFood(r){if(!r||!r.f)return null;if(r.f.db)return DB.map[r.f.id]||null;return Object.assign({},r.f,{cat:r.f.code?'Scanned':r.f.cat==='My foods'?'My foods':'Yours'})}
+// One-time backfill from past diary days, so earlier scans and entries are found straight away
+function fhBackfill(){const doc=get('foodhist');if(doc&&doc.bf)return;if(!DB.ready)return;
+  const list=[];for(const k of Object.keys(S.docs).filter(k=>k.startsWith('d-')).sort())for(const e of (S.docs[k].foods||[])){if(!e.per)continue;
+    const f=DB.map[e.fid]||customs().find(c=>c.id===e.fid)||{id:e.fid||null,code:/^o\d+$/.test(e.fid||'')?e.fid.slice(1):undefined,name:e.name,per:e.per,portions:e.unit&&e.unit!=='g'&&e.unitG?[[e.unit,e.unitG],['g',1]]:[['g',1]],src:/^o\d+$/.test(e.fid||'')?'Open Food Facts':undefined};
+    list.push({f,meal:e.meal,qty:e.qty,unit:e.unit,date:k.slice(2)})}
+  const d=fhDoc();d.items={};put('foodhist',d);fhRecordAll(list,{force:true});const d2=fhDoc();d2.bf=1;put('foodhist',d2)}
+function fhFor(f){const r=fhDoc().items[fhKey(f)];return r||null}
+// prefill the amount you usually log
+function fhPrefill(f){const r=fhFor(f);if(!r||!r.unit)return;const i=f.portions.findIndex(p=>p[0]===r.unit);if(i>=0){M.pi=i;M.qty=r.qty>0?r.qty:1}}
+function fhLists(meal){const it=fhDoc().items,rows=Object.values(it).filter(r=>r.f);
+  const usual=rows.filter(r=>(r.meals&&r.meals[meal]||0)>=2).sort((a,b)=>(b.meals[meal]-a.meals[meal])||((b.last||'').localeCompare(a.last||''))).slice(0,8);
+  const us=new Set(usual);const recent=rows.filter(r=>!us.has(r)).sort((a,b)=>(b.last||'').localeCompare(a.last||'')||(b.n-a.n)).slice(0,15);
+  return {usual,recent}}
+function fhSub(r){if(!r||!r.unit)return '';const q=Math.round((r.qty||1)*100)/100;return ` · usually ${q} ${esc(r.unit)}${r.n>1?` · logged ${r.n}×`:''}`}
+function fhCard(){const it=fhDoc().items,rows=Object.entries(it).filter(([,r])=>r.f).sort((a,b)=>fhScore(b[1])-fhScore(a[1]));
+  return `<section class="card" style="margin-top:18px"><div class="spread"><h3 style="font-size:18px">Food history</h3><span class="faint">${rows.length} food${rows.length===1?'':'s'}</span></div>
+  <p class="faint" style="margin:6px 0 10px;font-size:13.5px">Everything you log — scanned, searched, created or described — is remembered here and comes up first when you search. Remove anything you don’t want suggested.</p>
+  ${rows.length?`<div class="rlist">${rows.slice(0,S.fhAll?300:25).map(([k,r])=>`<div class="rrow"><div class="t" style="min-width:0"><div class="nm">${esc(r.f.name)}</div><div class="sub">${r.f.code?'▮▯▮ scanned · ':''}${r.n?`logged ${r.n}×`:'scanned, not logged yet'}${r.last?' · last '+esc(nice(r.last,{month:'short',day:'numeric'})):''}</div></div><button class="x" data-act="fhdel" data-k="${esc(k)}" aria-label="Forget ${esc(r.f.name)}">×</button></div>`).join('')}</div>${rows.length>25&&!S.fhAll?`<button class="btn ghost sm" data-act="fhall" style="margin-top:8px">Show all ${rows.length}</button>`:''}`:'<p class="faint">Nothing yet — log a few meals.</p>'}</section>`}
+const FHACT={
+  fhdel:el=>{const d=fhDoc();delete d.items[el.dataset.k];put('foodhist',d);render()},
+  fhall:()=>{S.fhAll=true;render()},
+};
+
 const ACT={
   day:el=>{S.date=addDays(S.date,+el.dataset.n);render()},
   today:()=>{S.date=today();render()},
   add:el=>{loadDB();openModal({kind:'food',tab:'search',meal:el.dataset.meal,q:''})},
   tab:el=>{if(el.dataset.seed&&M.q)M.aiText=M.q;M.tab=el.dataset.tab;drawModal()},
-  pick:el=>{const f=M.cache[el.dataset.fid];if(!f)return;M.sel=f;M.qty=1;M.pi=0;drawModal()},
+  pick:el=>{const f=M.cache[el.dataset.fid];if(!f)return;M.sel=f;M.qty=1;M.pi=0;fhPrefill(f);drawModal()},
   back:()=>{M.sel=null;if(M.editId){closeModal();return}drawModal()},
   close:closeModal,
   savefood:saveFood,
@@ -2000,7 +2052,7 @@ const ACT={
   airm:el=>{M.ai.splice(+el.dataset.i,1);drawModal(false)},
   aiadd:aiAdd,
   savecustom:saveCustom,
-  pickoff:async el=>{const code=el.dataset.code,m=M;el.disabled=true;let p=null;try{p=await offLookup(code)}catch(e){}if(M!==m)return;if(!p){toast('Couldn’t load that product');el.disabled=false;return}M.sel=p;M.qty=1;M.pi=0;drawModal()},
+  pickoff:async el=>{const code=el.dataset.code,m=M;el.disabled=true;let p=null;try{p=await offLookup(code)}catch(e){}if(M!==m)return;if(!p){toast('Couldn’t load that product');el.disabled=false;return}M.sel=p;M.qty=1;M.pi=0;fhPrefill(p);drawModal()},
   fixoff:()=>{const f=M.sel,g=f.portions[0][0]==='oz'?100:f.portions[0][1];const vals={};KEYS.forEach(k=>vals[k]=f.per[k]==null?null:r2(f.per[k]*g/100));const meal=M.meal;M={kind:'food',tab:'custom',meal,code:f.code,prefill:{name:f.name,sv:f.portions[0][0]==='oz'?'100 g':f.portions[0][0],g,vals}};drawModal()},
   bclookup:()=>{const v=$('#bc-num').value,c=normCode(v);if(!c||!checkOK(c)){M.scan={stage:'start',typed:v,err:'That doesn’t look like a valid barcode number — check the digits.'};drawModal(false);return}gotCode(c)},
   bcmanual:()=>{M.code=M.scan.code;M.tab='custom';M.prefill=null;drawModal()},
@@ -2012,7 +2064,7 @@ const ACT={
   delcustom:el=>{const doc=get('custom')||{foods:[]};doc.foods=doc.foods.filter(f=>f.id!==el.dataset.id);put('custom',doc);toast('Food deleted')},
   export:async()=>{const txt=JSON.stringify(S.docs,null,1);try{await navigator.clipboard.writeText(txt);toast('Copied your data to the clipboard')}catch(e){toast('Copy was blocked by the browser')}}
 };
-Object.assign(ACT,WACT,SACT,AACT,HACT,MACT,VACT,FACT,TACT,CACT,XACT,RACT,NACT);
+Object.assign(ACT,WACT,SACT,AACT,HACT,MACT,VACT,FACT,TACT,CACT,XACT,RACT,NACT,FHACT);
 document.addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');
   if(!el){if(e.target.id==='modal')closeModal();return}
